@@ -657,7 +657,6 @@ def discover(
             "status": c.status or "active",
             "starred": bool(c.starred) if c.starred is not None else False,
             "pinned": c.id in pinned_channels,
-            "is_channel": bool(c.is_channel),
             "visibility": "private" if c.name in personal_names else normalize_visibility(c.visibility, "public") or "public",
             "owner_email": c.owner_email,
             "participants_can_invite": bool(c.participants_can_invite),

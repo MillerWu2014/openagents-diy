@@ -793,11 +793,10 @@ class WorkspaceApi {
     });
   }
 
-  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; pinned?: boolean; isChannel?: boolean; masterAgent?: string; responseMode?: 'proactive' | 'passive'; orchestrationMode?: string; orchestrationInstruction?: string | null; workflowId?: string | null }): Promise<unknown> {
+  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; pinned?: boolean; masterAgent?: string; responseMode?: 'proactive' | 'passive'; orchestrationMode?: string; orchestrationInstruction?: string | null; workflowId?: string | null }): Promise<unknown> {
     // Map camelCase fields → snake_case for the backend.
-    const { masterAgent, responseMode, orchestrationMode, orchestrationInstruction, workflowId, isChannel, ...rest } = updates;
+    const { masterAgent, responseMode, orchestrationMode, orchestrationInstruction, workflowId, ...rest } = updates;
     const body: Record<string, unknown> = { ...rest };
-    if (isChannel !== undefined) body.is_channel = isChannel;
     if (masterAgent !== undefined) body.master_agent = masterAgent;
     if (orchestrationMode !== undefined) body.orchestration_mode = orchestrationMode;
     if (responseMode !== undefined) body.response_mode = responseMode;

@@ -102,7 +102,6 @@ class ChannelUpdateRequest(BaseModel):
     status: Optional[str] = None
     starred: Optional[bool] = None
     pinned: Optional[bool] = None
-    is_channel: Optional[bool] = None
     # v1.1: "private" (owner + participants + grants) | "public" (every
     # collaborator). "workspace" is accepted as an alias for "public".
     visibility: Optional[str] = None
@@ -231,7 +230,6 @@ def _format_channel(ch: Channel, db=None) -> dict:
         "forkedFrom": ch.forked_from,
         "status": ch.status,
         "starred": bool(ch.starred),
-        "isChannel": bool(ch.is_channel),
         "participants": [p.agent_name for p in (ch.participants or []) if not (builtin and not personal and p.agent_name == "yumi")],
         "visibility": "private" if personal or (ch.visibility or "") == "private" else "public",
         "ownerEmail": ch.owner_email,
@@ -2015,7 +2013,7 @@ def update_channel(
     if body.pinned is not None and (viewer.kind != "human" or not viewer.email):
         return json_response(ResponseCode.FORBIDDEN, "Sign in to pin a thread")
     protected = any(value is not None for value in (
-        body.title, body.status, body.master_agent, body.visibility, body.director_email, body.is_channel,
+        body.title, body.status, body.master_agent, body.visibility, body.director_email,
         body.response_mode, body.orchestration_mode, body.orchestration_instruction, body.workflow_id,
     ))
     if protected and not can_manage_thread_settings(db, viewer, channel):
@@ -2025,7 +2023,7 @@ def update_channel(
     if body.master_agent is not None:
         return json_response(ResponseCode.BAD_REQUEST, "Master mode is no longer supported")
     from app.services.personal_assistant import require_shareable_channel
-    if body.visibility is not None or body.is_channel or body.director_email is not None:
+    if body.visibility is not None or body.director_email is not None:
         require_shareable_channel(db, channel)
     if body.visibility is not None:
         vis = normalize_visibility(body.visibility)
@@ -2043,8 +2041,6 @@ def update_channel(
             channel.title_manually_set = True
     if body.status is not None:
         channel.status = body.status
-    if body.is_channel is not None:
-        channel.is_channel = body.is_channel
     if body.starred is not None:
         channel.starred = body.starred
     if body.master_agent is not None:

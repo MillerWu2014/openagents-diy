@@ -2,8 +2,7 @@
 
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
-import { Plus } from 'lucide-react';
-import { channelSessions, isIssueWorkSession, isRoutineSession, mergeConversationRows, sessionActivityTime, type ConversationRow } from '@/lib/conversation-list';
+import { isIssueWorkSession, isRoutineSession, mergeConversationRows, sessionActivityTime, type ConversationRow } from '@/lib/conversation-list';
 import { agentLabel } from '@/lib/helpers';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -38,7 +37,7 @@ export function ThreadList() {
   } = useWorkspace();
   const me = myAddress(currentUser);
   const humanNames = useHumanNames();
-  const { isMobile, openMobileDetail, openNewThread, openNewChannel, threadFilter: filter, setThreadFilter: setFilter, setSelectedAgentName } = useLayout();
+  const { isMobile, openMobileDetail, openNewThread, threadFilter: filter, setThreadFilter: setFilter, setSelectedAgentName } = useLayout();
   const t = useT();
   const { timeAgo } = useFormatters();
 
@@ -71,7 +70,6 @@ export function ThreadList() {
   const grouped = projectModel.grouped && !isSearching && filter !== 'dms';
 
   const activeSessions = useMemo(() => sortedSessions.filter((s) => s.status === 'active'), [sortedSessions]);
-  const channels = useMemo(() => channelSessions(sortedSessions), [sortedSessions]);
   const starredSessions = useMemo(() => activeSessions.filter((s) => s.starred), [activeSessions]);
   const archivedSessions = useMemo(() => sortedSessions.filter((s) => s.status === 'archived'), [sortedSessions]);
 
@@ -92,7 +90,6 @@ export function ThreadList() {
   // While searching, the query spans every thread regardless of the active tab
   const tabSessions = isSearching
     ? sortedSessions.filter((s) => s.title?.toLowerCase().includes(searchQuery.toLowerCase()) || hitsByChannel.has(s.sessionId))
-    : filter === 'channels' ? channels
     : filter === 'starred' ? starredSessions
     : filter === 'archived' ? archivedSessions
     : activeSessions;
@@ -125,7 +122,6 @@ export function ThreadList() {
   // Archived keep their totals.
   const tabCount: Record<FilterTab, number | undefined> = {
     all: unreadCount,
-    channels: channels.filter((s) => inProject(s) && unreadSessionIds.has(s.sessionId)).length,
     starred: starredSessions.filter(inProject).length + (projectModel.selected === 'all' ? visibleDMs : []).filter(dm => dm.starred).length,
     archived: archivedSessions.filter(inProject).length,
     dms: unreadDmCount,
@@ -229,7 +225,6 @@ export function ThreadList() {
       isSearching={isSearching}
       onClearSearch={() => setSearchQuery('')}
       onNewThread={openNewThread}
-      onNewChannel={openNewChannel}
     />
   );
 
@@ -269,16 +264,6 @@ export function ThreadList() {
                 </>
               ) : tab.id === 'starred' ? (
                 starredRows.length === 0 ? emptyState('starred') : renderConversations(starredRows)
-              ) : tab.id === 'channels' && visibleSessions.length > 0 && !isSearching ? (
-                <>
-                  <div className="flex px-1 py-2">
-                    <Button variant="outline" size="sm" onClick={openNewChannel}>
-                      <Plus data-icon="inline-start" />
-                      {t('threads.newChannel')}
-                    </Button>
-                  </div>
-                  {renderConversations(mergeConversationRows(visibleSessions, [], sortOrder, dmTitle))}
-                </>
               ) : visibleSessions.length === 0 ? (
                 emptyState(tab.id)
               ) : (

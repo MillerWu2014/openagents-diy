@@ -334,7 +334,6 @@ export interface WorkspaceSession {
   status: string;
   starred: boolean;
   pinned?: boolean;
-  isChannel?: boolean;
   participants: string[];
   master: string | null;
   // Multi-agent collaboration mode: 'dynamic' | 'master' | 'workflow'
@@ -1076,7 +1075,6 @@ export interface NetworkChannel {
   status: string;
   starred: boolean;
   pinned?: boolean;
-  is_channel?: boolean;
 }
 
 export interface NetworkDiscovery {
@@ -1215,7 +1213,6 @@ export function networkChannelToSession(ch: NetworkChannel, workspaceId: string)
     pinned: ch.pinned || false,
     icon: ch.icon,
     humanCount: ch.human_count,
-    isChannel: ch.is_channel || false,
     participants: ch.participants,
     master: ch.master,
     orchestrationMode: ch.orchestration_mode || 'dynamic',

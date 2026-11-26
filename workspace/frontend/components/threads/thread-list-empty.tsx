@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquare, MessageSquarePlus, Plus, Search } from 'lucide-react';
+import { MessageSquare, MessageSquarePlus, Search } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
@@ -11,14 +11,12 @@ interface ThreadListEmptyProps {
   isSearching: boolean;
   onClearSearch: () => void;
   onNewThread: () => void;
-  onNewChannel: () => void;
 }
 
-export function ThreadListEmpty({ tab, isSearching, onClearSearch, onNewThread, onNewChannel }: ThreadListEmptyProps) {
+export function ThreadListEmpty({ tab, isSearching, onClearSearch, onNewThread }: ThreadListEmptyProps) {
   const t = useT();
   const copy: Record<FilterTab, string> = {
     all: t('threads.emptyAll'),
-    channels: t('threads.emptyChannels'),
     starred: t('threads.emptyStarred'),
     archived: t('threads.emptyArchived'),
     dms: t('threads.emptyDms'),
@@ -29,11 +27,6 @@ export function ThreadListEmpty({ tab, isSearching, onClearSearch, onNewThread, 
     <Button variant="outline" size="sm" onClick={onNewThread}>
       <MessageSquarePlus data-icon="inline-start" />
       {t('threads.newThread')}
-    </Button>
-  ) : tab === 'channels' ? (
-    <Button size="sm" onClick={onNewChannel}>
-      <Plus data-icon="inline-start" />
-      {t('threads.newChannel')}
     </Button>
   ) : null;
 

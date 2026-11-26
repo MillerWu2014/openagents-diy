@@ -199,7 +199,7 @@ interface WorkspaceContextValue {
    *  by guided onboarding for the user's first agent. */
   requestFirstThread: (agentName: string, onReady?: () => void) => void;
   renameSession: (sessionId: string, title: string) => Promise<void>;
-  updateSession: (sessionId: string, updates: { starred?: boolean; pinned?: boolean; isChannel?: boolean; status?: string }) => Promise<void>;
+  updateSession: (sessionId: string, updates: { starred?: boolean; pinned?: boolean; status?: string }) => Promise<void>;
   addParticipant: (sessionId: string, agentName: string) => Promise<void>;
   removeParticipant: (sessionId: string, agentName: string) => Promise<void>;
   setSessionMaster: (sessionId: string, agentName: string) => Promise<void>;
@@ -967,7 +967,6 @@ export function WorkspaceProvider({
               status: remote.status,
               starred: remote.starred,
               pinned: remote.pinned,
-              isChannel: remote.isChannel,
               forkedFrom: remote.forkedFrom,
             };
           });
@@ -2178,7 +2177,7 @@ export function WorkspaceProvider({
     }
   }, []);
 
-  const updateSession = useCallback(async (sessionId: string, updates: { starred?: boolean; pinned?: boolean; isChannel?: boolean; status?: string }) => {
+  const updateSession = useCallback(async (sessionId: string, updates: { starred?: boolean; pinned?: boolean; status?: string }) => {
     // Capture previous state for rollback
     const previousSession = sessions.find((s) => s.sessionId === sessionId);
     // Optimistic update
@@ -2205,7 +2204,7 @@ export function WorkspaceProvider({
           setCurrentSessionId(previousSessionId);
         }
       }
-      if (updates.pinned !== undefined || updates.isChannel !== undefined) throw error;
+      if (updates.pinned !== undefined) throw error;
     }
   }, [currentSessionId, sessions]);
 

@@ -49,7 +49,7 @@ export function inboxDestination(
   return { kind: 'thread', channel };
 }
 
-type ThreadFilter = 'all' | 'channels' | 'starred' | 'archived' | 'dms';
+type ThreadFilter = 'all' | 'starred' | 'archived' | 'dms';
 
 /**
  * The thread-list tab to show beside a thread opened from the inbox: keep the
@@ -57,11 +57,10 @@ type ThreadFilter = 'all' | 'channels' | 'starred' | 'archived' | 'dms';
  * so the opened thread is never missing from the list next to it.
  */
 export function threadFilterFor(
-  session: Pick<WorkspaceSession, 'status' | 'starred' | 'isChannel'>,
+  session: Pick<WorkspaceSession, 'status' | 'starred'>,
   current: ThreadFilter,
 ): ThreadFilter {
   if (session.status === 'archived') return 'archived';
-  if (current === 'channels' && session.isChannel) return current;
   if (current === 'starred' && session.starred) return current;
   return 'all';
 }

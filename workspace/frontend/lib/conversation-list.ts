@@ -25,11 +25,6 @@ export function mergeConversationRows(threads: WorkspaceSession[], dms: DMConver
   });
 }
 
-/** Channels are a label on active threads, not a separate conversation type. */
-export function channelSessions(sessions: WorkspaceSession[]) {
-  return sessions.filter((s) => !isIssueWorkSession(s) && !isRoutineSession(s) && s.isChannel && s.status === 'active' && !s.sessionId.startsWith('dm:'));
-}
-
 /** Dedicated routine queues belong in Routines, even while one is open. */
 export function isRoutineSession(session: Pick<WorkspaceSession, 'sessionId'>): boolean {
   return /^routines?:/.test(session.sessionId);

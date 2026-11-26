@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { channelSessions, mergeConversationRows } from './conversation-list';
+import { mergeConversationRows } from './conversation-list';
 import type { WorkspaceSession, DMConversation } from './types';
 const thread = { sessionId: 'thread', title: 'Bravo', lastEventAt: 20 } as WorkspaceSession;
 const dm = { agents: ['human:me', 'human:sam'], lastMessage: { timestamp: 30 } } as DMConversation;
@@ -21,26 +21,10 @@ it.each(['recent', 'oldest', 'title'] as const)('keeps pinned threads first with
   if (order !== 'oldest') expect(unpinned[0].kind).toBe('dm');
 });
 
-it('filters Channels while retaining labels in All and preserving pin order', () => {
-  const channel = { ...thread, sessionId: 'channel', status: 'active', isChannel: true } as WorkspaceSession;
-  const pinned = { ...channel, sessionId: 'pinned-channel', pinned: true };
-  const archived = { ...channel, sessionId: 'archived-channel', status: 'archived' };
-  const synthetic = { ...channel, sessionId: 'dm:me,sam' };
-  const regular = { ...thread, status: 'active' } as WorkspaceSession;
-  expect(channelSessions([pinned, regular, archived, synthetic, channel])).toEqual([pinned, channel]);
-  expect(mergeConversationRows([regular, channel], [dm], 'recent', () => 'Sam').map(row => row.id)).toContain('channel');
-  expect(channelSessions([{ ...channel, isChannel: false }])).toEqual([]);
-});
-
-it('keeps automatic issue work out of conversation tabs even when pinned, renamed, or labeled as a channel', () => {
-  const execution = { ...thread, sessionId: 'issue-work-b474eebfd36f', title: 'Renamed execution', status: 'active', pinned: true, starred: true, isChannel: true } as WorkspaceSession;
-  // Ordinary conversations can have an issue-like title or be linked to an issue.
-  const linked = { ...thread, sessionId: 'support-queue', title: 'Issue work: customer support', status: 'active', isChannel: true } as WorkspaceSession;
-  const sessions = [execution, linked];
-  expect(mergeConversationRows(sessions, [], 'recent', () => '').map(row => row.id)).toEqual(['support-queue']);
-  expect(channelSessions(sessions)).toEqual([linked]);
-  // Filtering navigation must not remove the session needed by issue links.
-  expect(sessions).toContain(execution);
+it('keeps issue execution threads out of the conversation list', () => {
+  const execution = { ...thread, sessionId: 'issue-work-b474eebfd36f', title: 'Renamed execution', status: 'active', pinned: true, starred: true } as WorkspaceSession;
+  const linked = { ...thread, sessionId: 'support-queue', title: 'Issue work: customer support', status: 'active' } as WorkspaceSession;
+  expect(mergeConversationRows([execution, linked], [], 'recent', () => '').map(row => row.id)).toEqual(['support-queue']);
 });
 
 

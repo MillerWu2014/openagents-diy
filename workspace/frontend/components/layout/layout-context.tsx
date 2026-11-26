@@ -174,8 +174,8 @@ interface LayoutState {
   editAgentPending: EditAgentRequest | null;
   /** The devices tab calls this once it has acted on the request. */
   consumeEditAgent: () => void;
-  threadFilter: 'all' | 'channels' | 'starred' | 'archived' | 'dms';
-  setThreadFilter: (filter: 'all' | 'channels' | 'starred' | 'archived' | 'dms') => void;
+  threadFilter: 'all' | 'starred' | 'archived' | 'dms';
+  setThreadFilter: (filter: 'all' | 'starred' | 'archived' | 'dms') => void;
   selectedAgentName: string | null;
   setSelectedAgentName: (name: string | null) => void;
   isAgentPanelOpen: boolean;
@@ -207,10 +207,6 @@ interface LayoutState {
   setNewThreadOpen: (v: boolean) => void;
   /** Open the New Thread dialog so the user can pick agents for a new session */
   openNewThread: () => void;
-  /** Open the same dialog with "Make it a channel" already switched on */
-  openNewChannel: () => void;
-  /** Whether the open dialog started out as a new channel */
-  newThreadAsChannel: boolean;
   /**
    * Which half of the Files view the folder panel is pointing at: the folder
    * tree, or the trash. The detail pane swaps wholesale between them.
@@ -240,7 +236,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const setShowBrowserPreview = useCallback((open: boolean) => threadView.update({ previewOpen: open }), [threadView.update]);
   const setBrowserView = useCallback((view: BrowserView, browser?: ArtifactReference, watchOnly = false) => threadView.update({ browserView: view, browserWatchOnly: watchOnly, ...(view === 'closed' ? { selectedBrowser: null } : browser ? { selectedBrowser: browser } : {}) }), [threadView.update]);
   const setConversationWidth = useCallback((width: number) => threadView.update({ conversationWidth: width }), [threadView.update]);
-  const [threadFilter, setThreadFilter] = useState<'all' | 'channels' | 'starred' | 'archived' | 'dms'>('all');
+  const [threadFilter, setThreadFilter] = useState<'all' | 'starred' | 'archived' | 'dms'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('threads');
   useEffect(() => {
     const resource = requestedResource(window.location.href);
@@ -274,11 +270,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     setMobilePane('detail');
   }, [threadView.update]);
   const [newThreadOpen, setNewThreadOpen] = useState(false);
-  const [newThreadAsChannel, setNewThreadAsChannel] = useState(false);
-  // Separate openers rather than a flag argument: `openNewThread` is wired
-  // straight to onClick in many places, so it would receive the click event.
-  const openNewThread = () => { setNewThreadAsChannel(false); setNewThreadOpen(true); };
-  const openNewChannel = () => { setNewThreadAsChannel(true); setNewThreadOpen(true); };
+  const openNewThread = () => { setNewThreadOpen(true); };
 
   // Read on mount rather than in the initial state, so the server render and the
   // first client render agree before the stored preference is applied.
@@ -449,8 +441,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       newThreadOpen,
       setNewThreadOpen,
       openNewThread,
-      openNewChannel,
-      newThreadAsChannel,
     }}>
       <div data-slot="layout-wrapper" className="flex grow">
         <TooltipProvider delayDuration={0}>

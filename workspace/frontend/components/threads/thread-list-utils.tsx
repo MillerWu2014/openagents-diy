@@ -26,7 +26,7 @@ export const dmRowId = (agents: readonly string[]) => `dm:${agents[0]},${agents[
 
 // ── Filter tabs ──
 
-export type FilterTab = 'all' | 'channels' | 'starred' | 'archived' | 'dms';
+export type FilterTab = 'all' | 'starred' | 'archived' | 'dms';
 
 // Ordered the way people grow into the product: everything, then 1:1 DMs,
 // then channels, then the bookkeeping views.
