@@ -45,10 +45,7 @@ export function NewThreadDialogHost() {
         } }));
         // The create event carries no channel flag, so label it right after.
         // The thread exists either way; a failed label only leaves it a thread.
-        if (asChannel) {
-          await updateSession(session.sessionId, { isChannel: true }).catch(() => {});
-          setThreadFilter('channels');
-        }
+        void asChannel;
         setViewMode('threads');
         // On mobile, jump to the detail pane so the new thread is visible.
         if (isMobile) openMobileDetail();

@@ -1,45 +1,23 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { desktopHost } from './desktop-host';
-import { workspaceApi } from './api';
-import {
-  clearWorkspaceSession, loadWorkspaceSession, renewWorkspaceSession, sessionNeedsRenewal, type WorkspaceSession,
-} from './workspace-session';
+import React, { createContext, useContext } from 'react';
 
-/** How often a page on a workspace session checks whether to renew it. */
-const SESSION_CHECK_MS = 60 * 60 * 1000;
-
-interface OpenAgentsUser {
-  email: string;
-  displayName: string;
-  photoURL: string | null;
-}
+/** The app always opens as this person. There is no login screen. */
+export const LOCAL_USER = {
+  email: 'local@localhost',
+  displayName: 'Local',
+  photoURL: null as string | null,
+};
 
 interface OpenAgentsAuthContextValue {
-  user: OpenAgentsUser | null;
-  idToken: string | null;
+  user: typeof LOCAL_USER;
+  idToken: string;
   loading: boolean;
   isOpenAgentsDomain: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  /** Sign in on a workspace session just issued by the sign-in callback. */
-  adoptWorkspaceSession: (session: WorkspaceSession) => void;
+  adoptWorkspaceSession: (_session: unknown) => void;
 }
-
-// `workspace` is the desktop build: the launcher serves the bundle from
-// openagents://workspace/, so that is this app's own host there — the same way
-// workspace.openagents.org is on the web. Without it the desktop app would
-// decide it was a third-party deployment and show the marketing landing page.
-//
-// NEXT_PUBLIC_FIRST_PARTY_HOSTNAMES (comma-separated, build-time) adds more —
-// a preview or staging deployment on its own domain is still *our* app and
-// must get the login gate, not the third-party landing page.
-const OPENAGENTS_HOSTNAMES = [
-  'workspace.openagents.org', 'workspace-preview.openagents.org', 'localhost', 'workspace',
-  ...(process.env.NEXT_PUBLIC_FIRST_PARTY_HOSTNAMES || '')
-    .split(',').map((h) => h.trim()).filter(Boolean),
-];
 
 const OpenAgentsAuthContext = createContext<OpenAgentsAuthContextValue | null>(null);
 
@@ -50,226 +28,17 @@ export function useOpenAgentsAuth() {
 }
 
 export function OpenAgentsAuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<OpenAgentsUser | null>(null);
-  const [idToken, setIdToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isOpenAgentsDomain, setIsOpenAgentsDomain] = useState(false);
-  // The workspace session this page signed in on, if any (the Google-free
-  // path). Firebase renews its own tokens; this one is renewed below.
-  const [session, setSession] = useState<WorkspaceSession | null>(null);
-  const sessionRef = useRef<WorkspaceSession | null>(null);
-  sessionRef.current = session;
-
-  useEffect(() => {
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-    const isDomain = OPENAGENTS_HOSTNAMES.includes(hostname);
-    setIsOpenAgentsDomain(isDomain);
-
-    if (!isDomain) {
-      setLoading(false);
-      return;
-    }
-
-    // A workspace-issued session (the Google-free path, see lib/workspace-session)
-    // is authoritative on its own: restore it immediately, without waiting on
-    // — or being overridden by — Firebase, which may be unreachable.
-    const stored = loadWorkspaceSession();
-    if (stored) {
-      setUser({
-        email: stored.email,
-        displayName: stored.displayName || stored.email,
-        photoURL: null,
-      });
-      setIdToken(stored.token);
-      setSession(stored);
-      setLoading(false);
-      return;
-    }
-
-    if (desktopHost()) { setLoading(false); return; }
-
-    // Dynamically import firebase to avoid loading it on non-openagents domains
-    let unsubscribe: (() => void) | undefined;
-
-    // Firebase's initial auth-state resolution needs Google; where that is
-    // blocked, onAuthStateChanged never fires. Resolve to "signed out" after a
-    // short wait so the gate offers the sign-in button instead of spinning
-    // forever. The real listener still wins whenever it fires first.
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      setLoading(false);
-    };
-    const fallbackTimer = setTimeout(settle, 5000);
-
-    // Wake from sleep: the SDK's hourly refresh timer does not run while the
-    // machine sleeps, so ask for the token on return — the SDK refreshes it if
-    // it expired, and onIdTokenChange below then propagates the new one.
-    let onVisible: (() => void) | undefined;
-
-    import('./firebase').then(({ onIdTokenChange, getFreshIdToken, getResolvedEmail }) => {
-      workspaceApi.setBearerRefresher(async () => {
-        const fresh = await getFreshIdToken(true);
-        if (fresh) setIdToken(fresh);
-        return fresh;
-      });
-      onVisible = () => {
-        if (document.visibilityState === 'visible') void getFreshIdToken().catch(() => null);
-      };
-      document.addEventListener('visibilitychange', onVisible);
-
-      // onIdTokenChange (not onAuthChange): it also fires on the SDK's hourly
-      // token refresh. The token used to be captured once at sign-in and went
-      // stale after an hour, which v1.1 turned into "rejected by guard" on
-      // every send.
-      unsubscribe = onIdTokenChange(async (firebaseUser) => {
-        // The sign-in callback may have just signed this page in on a
-        // workspace session (adoptWorkspaceSession). As on a fresh load, that
-        // session is authoritative: neither Firebase reporting nobody nor an
-        // older Firebase user left in this browser may replace it.
-        if (loadWorkspaceSession()) {
-          settle();
-          return;
-        }
-        if (firebaseUser) {
-          const tokenResult = await firebaseUser.getIdTokenResult();
-          const token = tokenResult.token;
-          // Email/password users arrive via a custom token whose email lives in
-          // a custom claim, not firebaseUser.email — resolve both.
-          const email = firebaseUser.email || (await getResolvedEmail());
-          const claimName = typeof tokenResult.claims.name === 'string' ? tokenResult.claims.name.trim() : '';
-          const displayName = firebaseUser.displayName || claimName || email;
-          setUser({
-            email,
-            displayName,
-            photoURL: firebaseUser.photoURL,
-          });
-          setIdToken(token);
-        } else {
-          setUser(null);
-          setIdToken(null);
-        }
-        settle();
-      });
-    });
-
-    return () => {
-      clearTimeout(fallbackTimer);
-      unsubscribe?.();
-      if (onVisible) document.removeEventListener('visibilitychange', onVisible);
-      workspaceApi.setBearerRefresher(null);
-    };
-  }, []);
-
-  // In the desktop app the launcher owns the session and pushes renewals here;
-  // the page never decides on its own that the account has ended.
-  useEffect(() => desktopHost()?.onSession?.((session) => {
-    setUser({ email: session.email, displayName: session.displayName || session.email, photoURL: null });
-    setIdToken(session.token);
-  }), []);
-
-  // Keep a workspace session alive while it is in use, as the desktop app
-  // does: renew it a week before it lapses, and once more if the server
-  // rejects it. A session the server will no longer renew ends here, which
-  // signs the page out; the workspace page then sends the person to sign in
-  // once, instead of retrying a dead credential.
-  const hasSession = session !== null;
-  useEffect(() => {
-    if (!hasSession) return;
-    let stopped = false;
-    let inFlight: Promise<string | null> | null = null;
-    const renew = (): Promise<string | null> => {
-      const current = sessionRef.current;
-      if (!current) return Promise.resolve(null);
-      inFlight ??= renewWorkspaceSession(current)
-        .then((next) => {
-          if (stopped) return null;
-          if (!next) {
-            setSession(null);
-            setUser(null);
-            setIdToken(null);
-            return null;
-          }
-          setSession(next);
-          setIdToken(next.token);
-          return next.token;
-        })
-        // Offline or the server is down: keep the session and try again later.
-        .catch(() => null)
-        .finally(() => { inFlight = null; });
-      return inFlight;
-    };
-    const renewIfDue = () => {
-      const current = sessionRef.current;
-      if (current && sessionNeedsRenewal(current)) void renew();
-    };
-    workspaceApi.setBearerRefresher(renew);
-    renewIfDue();
-    const timer = setInterval(renewIfDue, SESSION_CHECK_MS);
-    const onVisible = () => { if (document.visibilityState === 'visible') renewIfDue(); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisible);
-      workspaceApi.clearBearerRefresher(renew);
-    };
-  }, [hasSession]);
-
-  const signIn = useCallback(async () => {
-    const host = desktopHost();
-    if (host) { host.signIn(); return; }
-    const { signInWithGoogle, getIdToken, getFreshIdToken, getResolvedEmail } = await import('./firebase');
-    const firebaseUser = await signInWithGoogle();
-    const token = await getIdToken();
-    if (!token) throw new Error('Sign-in did not return an identity token');
-    const email = firebaseUser.email || (await getResolvedEmail());
-    // A successful account switch supersedes a stored workspace session too.
-    // That restore path skips Firebase's listener, so install its refresher here.
-    clearWorkspaceSession();
-    setSession(null);
-    workspaceApi.setBearerRefresher(async () => {
-      const fresh = await getFreshIdToken(true);
-      if (fresh) setIdToken(fresh);
-      return fresh;
-    });
-    setUser({
-      email,
-      displayName: firebaseUser.displayName || email,
-      photoURL: firebaseUser.photoURL,
-    });
-    setIdToken(token);
-    // identify + sign_in are captured by the onAuthChange listener above,
-    // which this popup sign-in also triggers.
-  }, []);
-
-  const adoptWorkspaceSession = useCallback((session: WorkspaceSession) => {
-    setUser({
-      email: session.email,
-      displayName: session.displayName || session.email,
-      photoURL: null,
-    });
-    setIdToken(session.token);
-    setSession(session);
-    setLoading(false);
-  }, []);
-
-  const signOut = useCallback(async () => {
-    // Drop the workspace session first so a Firebase failure (Google
-    // unreachable) can't leave the user signed in.
-    clearWorkspaceSession();
-    setSession(null);
-    setUser(null);
-    setIdToken(null);
-    const host = desktopHost();
-    if (host) { host.signOut(); return; }
-    const { signOutUser } = await import('./firebase');
-    await signOutUser();
-  }, []);
-
+  const value: OpenAgentsAuthContextValue = {
+    user: LOCAL_USER,
+    idToken: 'local',
+    loading: false,
+    isOpenAgentsDomain: false,
+    signIn: async () => {},
+    signOut: async () => {},
+    adoptWorkspaceSession: () => {},
+  };
   return (
-    <OpenAgentsAuthContext.Provider value={{ user, idToken, loading, isOpenAgentsDomain, signIn, signOut, adoptWorkspaceSession }}>
+    <OpenAgentsAuthContext.Provider value={value}>
       {children}
     </OpenAgentsAuthContext.Provider>
   );

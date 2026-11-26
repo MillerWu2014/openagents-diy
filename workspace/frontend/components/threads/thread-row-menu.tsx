@@ -83,14 +83,6 @@ export function ThreadRowMenu({ session, projectActions }: { session: WorkspaceS
           </DropdownMenuItem>
           <DropdownMenuItem onClick={(e) => {
             e.stopPropagation();
-            void updateSession(session.sessionId, { isChannel: !session.isChannel })
-              .catch(() => toast.error(t('threads.channelLabelFailed')));
-          }}>
-            {session.isChannel ? <MessageSquare /> : <Hash />}
-            <span>{t(session.isChannel ? 'threads.convertToThread' : 'threads.markAsChannel')}</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={(e) => {
-            e.stopPropagation();
             void updateSession(session.sessionId, { pinned: !session.pinned }).catch(() => toast.error(t('threads.pinFailed')));
           }}>
             {session.pinned ? <PinOff /> : <Pin />}

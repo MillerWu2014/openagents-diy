@@ -154,7 +154,6 @@ export function ThreadRow({
         {/* Title row */}
         <div className="mb-0.5 flex items-center justify-between gap-1">
           <div className="flex min-w-0 items-center gap-1">
-            {session.isChannel && <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-label={t('threads.channel')} />}
             {session.pinned && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label={t('threads.pinned')} />}
             {session.starred && <Star className="size-3 shrink-0 fill-warning text-warning" />}
             {/* v1.1 M1: private thread — only invited people see it */}

@@ -19,7 +19,6 @@ import { Brand } from './brand';
 import { NavMain } from './nav-main';
 import { NavAgents } from './nav-agents';
 import { NavSecondary } from './nav-secondary';
-import { NotificationsMenu } from './notifications-menu';
 import { UserMenu } from './user-menu';
 import { useLayout, type ViewMode } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -115,7 +114,6 @@ export function MobileHeader() {
               threads list itself, where the new thread will show up — a global
               button here fired from Files or Browser and yanked you elsewhere. */}
           <div className="flex items-center gap-0.5 shrink-0 text-muted-foreground">
-            <NotificationsMenu />
             <UserMenu />
           </div>
         </div>

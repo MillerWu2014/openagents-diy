@@ -50,8 +50,13 @@ class SessionRequest(BaseModel):
     custom_token: str = Field(..., min_length=1, max_length=4096)
 
 
+def _login_removed():
+    return json_response(ResponseCode.BAD_REQUEST, "Login is disabled. This app opens as the local user.", status_code=410)
+
+
 @router.post("/session")
 def create_session(body: SessionRequest):
+    return _login_removed()
     """Exchange a login-handoff custom token for a workspace session.
 
     Responses:
@@ -85,6 +90,7 @@ def create_session(body: SessionRequest):
 
 @router.post("/session/renew")
 def renew_session(authorization: Optional[str] = Header(None)):
+    return _login_removed()
     """Trade a still-valid workspace session for a fresh one.
 
     A session lasts WORKSPACE_SESSION_TTL_DAYS and nothing on a device can
@@ -133,6 +139,7 @@ class AppleSessionRequest(BaseModel):
 
 @router.post("/apple-session")
 def create_apple_session(body: AppleSessionRequest):
+    return _login_removed()
     """Exchange a native Sign in with Apple identity token for a workspace session.
 
     The mobile app's Apple sign-in has no other long-lived credential: Apple's

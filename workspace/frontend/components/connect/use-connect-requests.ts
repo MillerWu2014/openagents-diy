@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useLayout, type EditAgentRequest } from '@/components/layout/layout-context';
-import { openImportSessions } from '@/components/agents/import-sessions-host';
 import { useT } from '@/lib/i18n';
 import { useWorkspace } from '@/lib/workspace-context';
 import type { NodeAgent, WorkspaceNode } from '@/lib/types';
@@ -73,23 +72,9 @@ export function useJoinedNotice(skip: boolean, canImport?: (agentName: string) =
   const { setSelectedAgentName } = useLayout();
   const { refreshAgents } = useWorkspace();
   return (name) => {
-    const tool = canImport?.(name) || null;
-    const importAction = { label: t('importSessions.action'), onClick: () => openImportSessions(name) };
-    if (skip) {
-      if (tool) toast(t('importSessions.onboardingOffer', { tool }), { action: importAction, duration: 30000 });
-      return;
-    }
-    // The profile reads the workspace's agent list, which may not have it yet.
+    if (skip) return;
+    // The profile reads the project agent list, which may not have it yet.
     const view = { label: t('connect.viewAgent'), onClick: () => { void refreshAgents().finally(() => setSelectedAgentName(name)); } };
-    if (tool) {
-      toast.success(t('connect.agentJoined', { name }), {
-        description: t('importSessions.joinedHint'),
-        action: importAction,
-        cancel: view,
-        duration: 15000,
-      });
-      return;
-    }
     toast.success(t('connect.agentJoined', { name }), { action: view });
   };
 }

@@ -7,9 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import { WorkspaceProvider, useWorkspace } from '@/lib/workspace-context';
 import { LayoutProvider } from '@/components/layout/layout-context';
 import { Wrapper } from '@/components/layout/wrapper';
-import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
-import { goToCentralLogin, redirectToLogin } from '@/lib/auth-redirects';
-import { LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { useT } from '@/lib/i18n';
@@ -187,92 +184,40 @@ function BearerWorkspace({ workspaceId, idToken }: { workspaceId: string; idToke
 }
 
 function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
-  const t = useT();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-  const { user, idToken, loading: authLoading, isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
+  const urlToken = searchParams.get('token');
+  const [token, setToken] = useState<string | null>(urlToken);
 
   useEffect(() => {
-    if (token) {
-      setWorkspaceCookie(workspaceId, token);
+    if (urlToken) {
+      setToken(urlToken);
+      setWorkspaceCookie(workspaceId, urlToken);
+      return;
     }
-  }, [workspaceId, token]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/v1/local/project`, { cache: 'no-store' });
+        const body = await res.json();
+        const project = body.data || body;
+        if (cancelled || !project?.token) return;
+        setWorkspaceCookie(project.slug || workspaceId, project.token);
+        setToken(project.token);
+      } catch { /* splash stays until a later retry */ }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId, urlToken]);
 
-  // "Add this workspace to my account": a signed-in user who opened a shared
-  // ?token= link is persisted as a member so it shows on their Membership Home.
-  useEffect(() => {
-    if (token && idToken) {
-      import('@/lib/account-api').then(({ joinWorkspaceSelf }) =>
-        joinWorkspaceSelf(workspaceId, idToken, token),
-      );
-    }
-  }, [workspaceId, token, idToken]);
+  if (!token) return <WorkspaceLoadingSplash />;
 
-  useEffect(() => {
-    if (!authLoading && isOpenAgentsDomain && (!user || !idToken)) redirectToLogin();
-  }, [authLoading, isOpenAgentsDomain, user, idToken]);
-
-  // Wait for the person's identity before ever configuring a token-only client.
-  if (authLoading || (isOpenAgentsDomain && (!user || !idToken))) return <WorkspaceLoadingSplash />;
-
-  // Has workspace token in URL — use it directly
-  if (token) {
-    return (
-      <WorkspaceProvider workspaceId={workspaceId} token={token} bearerToken={idToken || undefined}>
-        <IdentityGate>
-          <LayoutProvider>
-            <Wrapper />
-          </LayoutProvider>
-        </IdentityGate>
-      </WorkspaceProvider>
-    );
-  }
-
-  // No token — check if user is logged in via OpenAgents
-  if (isOpenAgentsDomain) {
-    if (authLoading) {
-      return <WorkspaceLoadingSplash />;
-    }
-
-    if (user && idToken) {
-      // Logged in, no ?token in the URL — resolve the workspace token from the
-      // account service using the user's identity, so the URL stays clean
-      // (/{slug}) while realtime (SSE, which needs a token) still works.
-      return <BearerWorkspace workspaceId={workspaceId} idToken={idToken} />;
-    }
-
-    // Not logged in — show login prompt
-    return (
-      <Empty className="min-h-screen rounded-none bg-background">
-        <EmptyHeader>
-          <EmptyTitle className="text-xl font-semibold">{t('workspaceGate.signInTitle')}</EmptyTitle>
-          <EmptyDescription>{t('workspaceGate.signInBody')}</EmptyDescription>
-        </EmptyHeader>
-        {/* Redirects to the central login page (openagents.org/login), which
-            offers all supported methods — not just Google — so the label/icon
-            stay method-neutral. */}
-        <EmptyContent>
-          <Button size="lg" onClick={() => goToCentralLogin(signIn)}>
-            <LogIn data-icon="inline-start" />
-            {t('workspaceGate.logIn')}
-          </Button>
-        </EmptyContent>
-      </Empty>
-    );
-  }
-
-  // Not on OpenAgents domain and no token — show token instructions
   return (
-    <Empty className="min-h-screen rounded-none bg-background">
-      <EmptyHeader>
-        <EmptyTitle className="text-xl font-semibold text-destructive">{t('workspaceGate.missingToken')}</EmptyTitle>
-        <EmptyDescription>
-          {t('workspaceGate.missingTokenBefore')}{' '}
-          <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-xs text-foreground">?token=your_workspace_token</code>{' '}
-          {t('workspaceGate.missingTokenAfter')}
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <WorkspaceProvider workspaceId={workspaceId} token={token}>
+      <IdentityGate>
+        <LayoutProvider>
+          <Wrapper />
+        </LayoutProvider>
+      </IdentityGate>
+    </WorkspaceProvider>
   );
 }
 

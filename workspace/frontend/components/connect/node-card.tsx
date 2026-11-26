@@ -13,8 +13,6 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { nodeCommandErrorKey } from '@/lib/node-command-error';
 import type { NodeAgent, WorkspaceNode } from '@/lib/types';
 import { NodeAgentItem } from './node-agent-item';
-import { isImportableType } from '@/components/agents/import-sessions-dialog';
-import { openImportSessions } from '@/components/agents/import-sessions-host';
 import { NodeOfflineHelp } from './node-offline-help';
 import { NodePendingAgent } from './node-pending-agent';
 import { NodeSummary } from './node-summary';
@@ -204,7 +202,6 @@ export function NodeCard({
                   onToggle={(action) => void toggleAgent(a, action)}
                   onEdit={() => onEditAgent(a)}
                   onRemove={() => void queue('remove_agent', { name: a.name })}
-                  onImport={isImportableType(a.type) && ownsDevice ? () => openImportSessions(a.name) : undefined}
                 />
               ))}
             </div>

@@ -77,26 +77,10 @@ export function NavRail() {
       icon: <MessageSquare />,
       count: unreadThreadsTotal,
     },
-    {
-      mode: 'issues',
-      label: t('views.issues'),
-      icon: <CircleDot />,
-      count: unreadIssues,
-      urgent: true,
-    },
     { mode: 'files', label: t('views.files'), icon: <FileText /> },
     { mode: 'browser', label: t('views.browser'), icon: <Globe /> },
     { mode: 'routines', label: t('views.routines'), icon: <CalendarClock /> },
-    { mode: 'knowledge', label: t('views.knowledge'), icon: <BookOpen /> },
-
-    {
-      mode: 'inbox',
-      label: t('views.inbox'),
-      icon: <Inbox />,
-      count: unreadNotificationCount,
-    },
     { mode: 'skills', label: t('views.skills'), icon: <Sparkles /> },
-    { mode: 'workflows', label: t('views.workflows'), icon: <Waypoints /> },
     // v1.1 M2: team specialists directory
     { mode: 'agents', label: t('collab.viewAgents'), icon: <Bot /> },
   ];
@@ -192,26 +176,6 @@ export function NavRail() {
                 showLabels={showLabels}
                 onClick={() => openConnect ? openConnect() : openView('connect')}
               />
-              {showLabels && (
-                <WithTooltip label={t('views.inbox')}><Button
-                      variant="outline"
-                      size="icon"
-                      className="relative shrink-0"
-                      aria-label={t('views.inbox')}
-                      aria-current={inboxActive ? 'page' : undefined}
-                      onClick={() => openView('inbox')}
-                    >
-                      <Mail />
-                      {unreadNotificationCount > 0 && (
-                        <UnreadBadge
-                          count={unreadNotificationCount}
-                          size="corner"
-                          className="absolute -top-1 -right-1"
-                          aria-label={t('nav.unreadCount', { count: unreadNotificationCount })}
-                        />
-                      )}
-                    </Button></WithTooltip>
-              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
@@ -223,15 +187,6 @@ export function NavRail() {
           {showLabels && <SidebarGroupLabel className="px-2">{t('nav.collaboration')}</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
-              {welcomeNavigation.available && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={welcome} aria-current={welcome ? 'page' : undefined} aria-label={t('nav.welcome')}
-                    tooltip={{ children: t('nav.welcome'), hidden: showLabels }}
-                    className={cn(!showLabels && 'justify-center!')} onClick={() => welcomeNavigation.open ? welcomeNavigation.open() : openView('connect')}>
-                    <Sparkles />{showLabels && <span>{t('nav.welcome')}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               {navItems.filter((item) => item.mode !== 'agents' || workspace?.settings?.services_enabled === true).map((item) => (
                 <SidebarMenuItem key={item.mode} data-tour={`view-${item.mode}`}>
                   <SidebarMenuButton

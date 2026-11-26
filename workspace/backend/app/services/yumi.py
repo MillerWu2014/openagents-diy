@@ -83,9 +83,8 @@ def resolve_model(cloud_config: CloudAgentConfig) -> str:
 # ---------------------------------------------------------------------------
 
 def should_provision() -> bool:
-    """Only seed Yumi when enabled AND a server key is configured, so
-    self-hosted deployments without a key don't get a broken agent."""
-    return bool(config.YUMI_ENABLED and config.YUMI_API_KEY)
+    """The built-in Q&A assistant is not part of this build."""
+    return False
 
 
 def provision_yumi(db, workspace) -> bool:

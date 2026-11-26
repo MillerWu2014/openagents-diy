@@ -25,7 +25,7 @@ from app.services.routine_backoff import ROUTINE_STUCK_MS
 # load before any request can write permission rows.
 import app.services.permission_cache  # noqa: E402,F401
 from app.routers import jam_setup
-from app.routers import guest_links, imported_sessions, personal_settings, hub, mcp, oauth, public_shares, web_projects, reactions, agent_services, account, agent_profile, app_version, approvals, auth, briefs, browser, cloud_agents, devices, hosted_agents, events, feedback, fetch, files, grants, groups, integrations, invites, issues, knowledge, model_access, network, nodes, notifications, onboarding, read_state, registry, routines, search, shares, sharing, tasks, thread_access, timers, todos, watches, workflows, workspaces
+from app.routers import guest_links, personal_settings, hub, mcp, oauth, public_shares, web_projects, reactions, agent_services, account, agent_profile, app_version, approvals, auth, briefs, browser, cloud_agents, devices, hosted_agents, events, feedback, fetch, files, grants, groups, integrations, invites, local_project, model_access, network, nodes, notifications, read_state, registry, routines, search, shares, sharing, tasks, thread_access, timers, todos, watches, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -808,26 +808,22 @@ app.include_router(guest_links.router)
 app.include_router(guest_links.root_router)
 app.include_router(jam_setup.router)
 app.include_router(personal_settings.router)
-app.include_router(imported_sessions.router)
+app.include_router(local_project.router)
 app.include_router(web_projects.router)
 app.include_router(integrations.router)
 app.include_router(invites.router)
-app.include_router(knowledge.router)
 app.include_router(model_access.router)
 app.include_router(network.router)
 app.include_router(nodes.router)
 app.include_router(nodes.devices_router)  # /v1/devices/* alias — must stay after devices.router
 app.include_router(notifications.router)
-app.include_router(onboarding.router)
 app.include_router(read_state.router)
 app.include_router(registry.router)
 app.include_router(routines.router)
 app.include_router(search.router)
 app.include_router(shares.router)
-app.include_router(issues.router)
 app.include_router(tasks.router)
 app.include_router(todos.router)
-app.include_router(workflows.router)
 app.include_router(timers.router)
 app.include_router(watches.router)
 app.include_router(workspaces.router)

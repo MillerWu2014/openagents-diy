@@ -7,14 +7,15 @@ export function isOwnedAgent(agent: WorkspaceAgent, email: string): boolean {
 
 /** Yumi belongs in everyone's own sidebar group, without changing ownership permissions. */
 export function isMySidebarAgent(agent: WorkspaceAgent, email: string): boolean {
-  return agent.builtin === true || isOwnedAgent(agent, email);
+  if (agent.builtin === true) return false;
+  return isOwnedAgent(agent, email);
 }
 
 /** Owned agents and agents the server permits this viewer to contact directly. */
 export function sidebarAgents(agents: WorkspaceAgent[], email: string) {
   const viewer = email.trim().toLowerCase();
   if (!viewer) return [];
-  return agents.filter((agent) => agent.status !== 'removed' && (
+  return agents.filter((agent) => agent.builtin !== true && agent.status !== 'removed' && (
     isOwnedAgent(agent, viewer) || agent.canStartThread === true
   )).sort((a, b) => Number(isOwnedAgent(b, viewer)) - Number(isOwnedAgent(a, viewer)));
 }

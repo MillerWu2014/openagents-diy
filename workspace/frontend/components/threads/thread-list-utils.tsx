@@ -33,7 +33,6 @@ export type FilterTab = 'all' | 'channels' | 'starred' | 'archived' | 'dms';
 export const TABS: { id: FilterTab; labelKey: MessageKey }[] = [
   { id: 'all', labelKey: 'threads.tabAll' },
   { id: 'dms', labelKey: 'threads.tabDms' },
-  { id: 'channels', labelKey: 'threads.tabChannels' },
   { id: 'starred', labelKey: 'threads.tabStarred' },
   { id: 'archived', labelKey: 'threads.tabArchived' },
 ];
