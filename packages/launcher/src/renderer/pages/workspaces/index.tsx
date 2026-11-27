@@ -14,6 +14,7 @@ import {
 } from "@renderer/components/ui/empty"
 import { WorkspaceCard } from "@renderer/components/workspaces/workspace-card"
 import { WorkspaceQuickConnect } from "@renderer/components/workspaces/WorkspaceQuickConnect"
+import { openJoinDialog } from "@renderer/components/workspaces/JoinRemoteProject"
 import { WorkspaceRemoveDialog } from "@renderer/components/workspaces/WorkspaceRemoveDialog"
 import { WorkspaceRevokedNotice } from "@renderer/components/workspaces/WorkspaceRevokedNotice"
 import { WorkspaceRenameDialog } from "@renderer/components/workspaces/WorkspaceRenameDialog"
@@ -174,6 +175,9 @@ export default function Workspaces({ showToast }: Props): React.JSX.Element {
                 className={cn(refreshing && "animate-spin")}
               />
               {t("workspaces.refresh")}
+            </Button>
+            <Button variant="outline" onClick={() => openJoinDialog()}>
+              {t("workspaces.joinRemote.button")}
             </Button>
             <Button data-testid="workspace-join-open" onClick={openQuick}>
               <Plus data-icon="inline-start" />

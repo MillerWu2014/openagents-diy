@@ -547,7 +547,7 @@ class TestTargetedInvites:
         assert r.status_code == 200, r.text
         inv = r.json()["data"]
         assert inv["targetKind"] == "channel" and inv["targetId"] == "inv-1" and inv["note"] == "please review"
-        token = inv["url"].rsplit("/", 1)[1]
+        token = inv["code"]
 
         peek = client.get(f"/v1/invites/{token}").json()["data"]
         assert peek["target_kind"] == "channel" and peek["target_id"] == "inv-1"
@@ -571,7 +571,7 @@ class TestTargetedInvites:
         r = _create_invite(client, workspace, _bearer("adam", workspace), email="nina@acme.test",
                            target_kind="agent", target_id="deploy-bot")
         assert r.status_code == 200, r.text
-        token = r.json()["data"]["url"].rsplit("/", 1)[1]
+        token = r.json()["data"]["code"]
         assert client.get(f"/v1/invites/{token}").json()["data"]["target_title"] == "deploy-bot"
         r = client.post(f"/v1/invites/{token}/accept", headers=_bearer("nina"))
         assert r.status_code == 200, r.text
@@ -587,7 +587,7 @@ class TestTargetedInvites:
         db.commit()
         r = _create_invite(client, workspace, _tok(workspace), email="zoe@acme.test", target_kind="task", target_id="t1")
         assert r.status_code == 200, r.text
-        token = r.json()["data"]["url"].rsplit("/", 1)[1]
+        token = r.json()["data"]["code"]
         assert client.get(f"/v1/invites/{token}").json()["data"]["target_title"] == "Ship v1.1"
         r = client.post(f"/v1/invites/{token}/accept", headers=_bearer("zoe"))
         assert r.status_code == 200, r.text
@@ -597,7 +597,7 @@ class TestTargetedInvites:
 
     def test_open_invite_without_target_is_unchanged(self, client, workspace, people):
         r = _create_invite(client, workspace, _bearer("adam", workspace), role="viewer")
-        token = r.json()["data"]["url"].rsplit("/", 1)[1]
+        token = r.json()["data"]["code"]
         peek = client.get(f"/v1/invites/{token}").json()["data"]
         assert peek["target_kind"] is None and peek["target_title"] is None
         d = client.post(f"/v1/invites/{token}/accept", headers=_bearer("zoe")).json()["data"]

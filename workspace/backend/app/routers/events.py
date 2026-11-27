@@ -682,6 +682,23 @@ class RoutingChoiceRequest(BaseModel):
     reclassify: bool = False  # Explicit sender action on a human-directed message.
 
 
+def _routing_actor(viewer, original) -> Optional[str]:
+    """Who this assignment is made as.
+
+    A signed-in person acts as themselves. A workspace token has no login: on
+    this computer that token is the project, so it acts as the person who
+    posted the message.
+    """
+    if viewer.kind == "human" and viewer.email:
+        return viewer.email.lower()
+    source = str(getattr(original, "source", "") or "")
+    if viewer.machine and source.lower().startswith("human:"):
+        email = source.split(":", 1)[1].strip().lower()
+        if email:
+            return email
+    return None
+
+
 @router.post("/events/{event_id}/routing")
 def resolve_routing_choice(
     event_id: str,
@@ -707,16 +724,17 @@ def resolve_routing_choice(
     if not workspace or not _verify_workspace_access(workspace, x_workspace_token, authorization):
         raise HTTPException(403, "No access to this workspace")
     viewer = resolve_viewer(db, workspace, x_workspace_token, authorization)
-    if viewer.kind != "human" or not viewer.email:
-        raise HTTPException(403, "Sign in as the message sender")
     original = db.execute(select(EventRecord).where(
         EventRecord.id == event_id, EventRecord.network_id == workspace.id,
         EventRecord.type == "workspace.message.posted",
     ).with_for_update()).scalar_one_or_none()
+    actor = _routing_actor(viewer, original)
+    if not actor:
+        raise HTTPException(403, "Sign in as the message sender")
     metadata = (original.metadata_ or {}) if original else {}
     choice = metadata.get("routing_choice")
     if body.reclassify:
-        if not original or original.source.lower() != f"human:{viewer.email.lower()}":
+        if not original or original.source.lower() != f"human:{actor}":
             raise HTTPException(403, "Only the message sender can choose an agent")
         if (not original.target.startswith("channel/") or metadata.get("recalled")
                 or metadata.get("routing_assignment") or metadata.get("approval_id") or metadata.get("approval")
@@ -727,10 +745,10 @@ def resolve_routing_choice(
         if not already_assigned and (metadata.get("target_agents") != ["__no_response__"] or not body.agent):
             raise HTTPException(409, "Only human-directed messages can be reassigned")
         if not already_assigned:
-            choice = {"status": "pending", "requester_email": viewer.email.lower(), "candidates": [body.agent]}
+            choice = {"status": "pending", "requester_email": actor, "candidates": [body.agent]}
     if not isinstance(choice, dict) or not original.target.startswith("channel/"):
         raise HTTPException(404, "Assignment request not found")
-    if viewer.email.lower() != str(choice.get("requester_email", "")).lower():
+    if actor != str(choice.get("requester_email", "")).lower():
         raise HTTPException(403, "Only the message sender can choose an agent")
     channel = db.execute(select(Channel).where(Channel.workspace_id == workspace.id,
         Channel.name == original.target[8:], Channel.status == "active")).scalar_one_or_none()
@@ -749,7 +767,7 @@ def resolve_routing_choice(
     if (body.agent not in choice.get("candidates", []) or not member or member.status == "removed"
             or (body.reclassify and member.status != "online")
             or not db.get(ChannelMember, (channel.id, body.agent))
-            or request_access(db, str(workspace.id), channel, member, viewer.email.lower()) == "no"):
+            or request_access(db, str(workspace.id), channel, member, actor) == "no"):
         raise HTTPException(403, "This agent is no longer available to you in this thread")
     if get_active_run(db, str(workspace.id), channel.name):
         raise HTTPException(409, "A workflow is now running in this thread")
@@ -763,12 +781,12 @@ def resolve_routing_choice(
         payload = {"content": "Continue this request: " + bounded((root.payload or {}).get('content'))
                    + "\nNext task: " + str(choice.get('task') or 'Determine and complete the remaining work.')
                    + "\nLatest agent result (context):\n" + bounded((original.payload or {}).get('content'))}
-    payload.update({"sender_email": viewer.email.lower(), "sender_id": viewer.email.lower(),
+    payload.update({"sender_email": actor, "sender_id": actor,
                     "message_type": "chat"})
-    event = Event(type="workspace.message.posted", source=f"human:{viewer.email.lower()}",
+    event = Event(type="workspace.message.posted", source=f"human:{actor}",
         target=original.target, visibility=original.visibility or "channel", payload=payload,
         metadata={"routing_assignment": {"message_id": original.id, "agent": body.agent, "thread_id": channel.id},
-                  "acting_for": viewer.email.lower()})
+                  "acting_for": actor})
     updated.update(status="assigned", agent=body.agent, assignment_event_id=event.id)
     original.metadata_ = {**(original.metadata_ or {}), "routing_choice": updated}
     context = PipelineContext(network_id=str(workspace.id), agent_address=event.source,

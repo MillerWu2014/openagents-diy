@@ -3,6 +3,9 @@
 import { memo, type ReactNode, useMemo, isValidElement, cloneElement } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { promoteLatexDelimiters } from './latex-delimiters';
 import type { Root } from 'mdast';
 import { getAgentColor } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
@@ -14,7 +17,8 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Stable plugin arrays — avoids re-creating on every render
-const remarkPlugins = [remarkGfm];
+const remarkPlugins = [remarkGfm, remarkMath];
+const rehypePlugins = [[rehypeKatex, { throwOnError: false, strict: 'ignore' }]];
 
 /** Parse the full Markdown first so shortening it never breaks a fence or link. */
 function remarkExcerpt({ limit }: { limit: number }) {
@@ -239,10 +243,11 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
   return (
     <div className="markdown-content">
       <ReactMarkdown
-        remarkPlugins={excerptLimit ? [remarkGfm, [remarkExcerpt, { limit: excerptLimit }]] : remarkPlugins}
+        remarkPlugins={excerptLimit ? [remarkGfm, remarkMath, [remarkExcerpt, { limit: excerptLimit }]] : remarkPlugins}
+        rehypePlugins={rehypePlugins}
         components={components}
       >
-        {content}
+        {promoteLatexDelimiters(content)}
       </ReactMarkdown>
     </div>
   );

@@ -416,7 +416,10 @@ def list_nodes(
     if user:
         query = query.where(Node.owner_email == user.email.strip().lower())
     elif not authorization and x_workspace_token:
-        query = query.where(Node.token == x_workspace_token)
+        # The project credential sees every connection. A device credential
+        # sees only itself, so one computer cannot list the others.
+        if not (workspace.password_hash and x_workspace_token == workspace.password_hash):
+            query = query.where(Node.token == x_workspace_token)
     else:
         return json_response(ResponseCode.FORBIDDEN, "Sign in to view your device connections")
     nodes = db.execute(query.order_by(Node.created_at.asc())).scalars().all()

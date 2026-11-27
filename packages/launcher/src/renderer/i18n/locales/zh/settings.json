@@ -6,6 +6,7 @@
     "agents": "智能体",
     "notifications": "通知",
     "network": "网络",
+    "router": "路由模型",
     "data": "数据",
     "language": "语言",
     "updates": "更新",
@@ -45,6 +46,12 @@
       "desc": "配置网络连接与访问设置",
       "keywords": "网络 代理 proxy 镜像 加速 工作区 端点",
       "short": "下载源、工作区与代理"
+    },
+    "router": {
+      "title": "路由模型",
+      "desc": "决定由哪个智能体回复，以及谁接着往下做",
+      "keywords": "路由 模型 接力 交接 router openai deepseek ollama lm studio",
+      "short": "消息分派与自动接力"
     },
     "data": {
       "title": "数据",
@@ -205,7 +212,7 @@
     "workspaceGroup": "工作区访问端点",
     "workspaceUrl": "工作区后端地址",
     "workspaceUrlDesc": "可选的自托管工作区服务器。留空则使用 $t(common.brandName) 官方托管的工作区。",
-    "workspaceUrlPlaceholder": "https://workspace.openagents.org 或 http://localhost:8000",
+    "workspaceUrlPlaceholder": "http://127.0.0.1:18765",
     "proxyGroup": "代理设置",
     "httpProxy": "HTTP 代理",
     "httpProxyDesc": "智能体与 $t(common.appName) 进行出站 HTTP 时使用",
@@ -223,6 +230,21 @@
       "timeout": "连接超时",
       "unreachable": "无法连接"
     }
+  },
+  "router": {
+    "group": "OpenAI 兼容模型",
+    "groupDesc": "没有 @ 时由它判断该哪个智能体回复，智能体做完后由它决定是否自动交给下一个。地址或模型留空即关闭。会话里最近的消息会发送到这个地址。",
+    "baseUrl": "接口地址",
+    "baseUrlDesc": "DeepSeek：https://api.deepseek.com · Ollama：http://127.0.0.1:11434/v1 · LM Studio：http://127.0.0.1:1234/v1",
+    "apiKey": "API Key",
+    "apiKeyDesc": "Ollama 和 LM Studio 可留空。只保存在本机，导出设置时不包含。",
+    "model": "模型",
+    "modelDesc": "例如 deepseek-chat，或本地模型名。建议用响应快、不做长推理的模型。",
+    "save": "保存路由模型",
+    "saving": "正在重启项目…",
+    "saved": "路由模型已保存",
+    "savedRestart": "路由模型已保存，重启 OpenAgents 后生效",
+    "saveFailed": "路由模型未保存。{{error}}"
   },
   "data": {
     "locationsGroup": "存储位置",

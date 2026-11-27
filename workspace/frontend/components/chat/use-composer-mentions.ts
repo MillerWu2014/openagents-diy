@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import type { WorkspaceAgent, KnowledgeEntry } from '@/lib/types';
-import { isRecentAgent } from '@/lib/helpers';
 import { agentAvailability, type AgentAvailability } from '@/lib/collab'; // v1.1 M3
 import { useWorkspace } from '@/lib/workspace-context';
 import { knowledgeTitle } from '@/lib/knowledge-title';
@@ -44,19 +43,15 @@ export function useComposerMentions({ conversationId, agents, knowledge, mention
 
   const filter = mentionFilter.toLowerCase();
 
-  // Suggest online agents plus recently-seen / device-offline ones — the
-  // request queues for those (v1.1 M3), so they stay pickable with a muted
-  // hint; long-gone agents would only clutter the picker. Available first.
-  // Filter matches either the ASCII agent name or the user-set display name
-  // (e.g. typing "小" finds the agent labeled "小明"); the inserted mention is
-  // always the agent name.
+  // Thread members only. An offline agent stays in the list: the row is muted,
+  // and the session is delivered when it is back. Available ones sort first.
+  // The filter matches the agent name or its display name; the inserted
+  // mention is always the agent name.
   const filteredAgents = agents
     .filter(a => participants.agents.includes(a.agentName))
     .filter(
-      (a) => (a.status === 'online' || isRecentAgent(a)) && (
-        a.agentName.toLowerCase().includes(filter) ||
+      (a) => a.agentName.toLowerCase().includes(filter) ||
         (a.displayName || '').toLowerCase().includes(filter)
-      )
     )
     .sort((a, b) => AVAILABILITY_RANK[availabilityOf(a)] - AVAILABILITY_RANK[availabilityOf(b)]);
 

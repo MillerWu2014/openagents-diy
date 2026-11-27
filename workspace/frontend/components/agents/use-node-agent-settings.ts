@@ -24,24 +24,9 @@ async function waitForCommand(nodeId: string, commandId: string): Promise<NodeCo
   return null;
 }
 
-/**
- * Whether a provider (Acenta) hosts this agent's runtime. Such an agent joins
- * through a connection of its own, so it carries a node id and a folder
- * (`/workspace` in the provider's sandbox), yet it has no device of yours,
- * folder or key to change. null until known.
- */
-export function useHostedRuntime(agentName: string | undefined, enabled: boolean): boolean | null {
-  const [hosted, setHosted] = useState<boolean | null>(null);
-  useEffect(() => {
-    setHosted(null);
-    if (!enabled || !agentName) return;
-    let cancelled = false;
-    workspaceApi.listHostedAgents()
-      .then((rows) => { if (!cancelled) setHosted(rows.some((h) => h.agentName === agentName)); })
-      .catch(() => { if (!cancelled) setHosted(false); });
-    return () => { cancelled = true; };
-  }, [agentName, enabled]);
-  return hosted;
+/** Provider-hosted runtimes (Acenta) are not part of this build. */
+export function useHostedRuntime(_agentName: string | undefined, _enabled: boolean): boolean | null {
+  return false;
 }
 
 /**

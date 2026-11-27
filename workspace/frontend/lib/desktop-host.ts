@@ -9,8 +9,26 @@ export interface DesktopComputer {
   warning: boolean;
 }
 
+export interface LocalAgentChoice {
+  name: string;
+  displayName?: string | null;
+}
+
 export interface DesktopHost {
   openComputer(): void;
+  /** Agents already installed on this computer. Optional: only the desktop app has them. */
+  listLocalAgents?(): Promise<LocalAgentChoice[]>;
+  /** Native folder picker. Null when the user cancels. */
+  pickDirectory?(): Promise<string | null>;
+  /**
+   * Create a local project, pair this computer, and point the chosen agents
+   * at one folder. Returns the project the page should open.
+   */
+  createLocalProject?(input: {
+    name: string;
+    directory: string;
+    agents: string[];
+  }): Promise<{ slug: string; name: string; token: string }>;
   signIn(): void;
   signOut(): void;
   connectComputer(workspaceId: string): Promise<DesktopComputer>;
@@ -38,6 +56,8 @@ export interface DesktopHost {
    * workspace's slug and its id. Optional: only a launcher with tabs has it.
    */
   reportWorkspace?(info: { id: string; slug: string; name: string }): void;
+  /** Ask the launcher to point this computer's agents at a project. */
+  focusProject?(slug: string): void;
   /**
    * The launcher's own Sign out button, above All Workspaces, asks this page
    * to confirm it, so both sign-outs share one dialog. Optional, as onSession.

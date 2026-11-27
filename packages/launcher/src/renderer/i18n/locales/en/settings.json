@@ -6,6 +6,7 @@
     "agents": "Agents",
     "notifications": "Notifications",
     "network": "Network",
+    "router": "Router Model",
     "data": "Data",
     "language": "Language",
     "updates": "Updates",
@@ -45,6 +46,12 @@
       "desc": "Connectivity, mirrors and proxy settings",
       "keywords": "network proxy mirror download workspace endpoint",
       "short": "Mirrors, workspace and proxy"
+    },
+    "router": {
+      "title": "Router Model",
+      "desc": "The model that decides which agent answers and who picks up next",
+      "keywords": "router model routing handoff llm openai deepseek ollama lm studio",
+      "short": "Routing and agent handoffs"
     },
     "data": {
       "title": "Data",
@@ -205,7 +212,7 @@
     "workspaceGroup": "Workspace endpoint",
     "workspaceUrl": "Workspace backend URL",
     "workspaceUrlDesc": "Optional self-hosted workspace server. Leave empty to use $t(common.brandName)-hosted workspaces.",
-    "workspaceUrlPlaceholder": "https://workspace.openagents.org or http://localhost:8000",
+    "workspaceUrlPlaceholder": "http://127.0.0.1:18765",
     "proxyGroup": "Proxy",
     "httpProxy": "HTTP proxy",
     "httpProxyDesc": "Used for outbound HTTP by agents and $t(common.appName)",
@@ -223,6 +230,21 @@
       "timeout": "Timed out",
       "unreachable": "Unreachable"
     }
+  },
+  "router": {
+    "group": "OpenAI-compatible model",
+    "groupDesc": "Used to pick which agent answers a message without an @, and to hand work on to the next agent automatically. Leave the address or model empty to turn it off. Recent messages from the thread are sent to this address.",
+    "baseUrl": "Base URL",
+    "baseUrlDesc": "DeepSeek: https://api.deepseek.com · Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1",
+    "apiKey": "API key",
+    "apiKeyDesc": "Leave empty for Ollama and LM Studio. Stored on this computer and left out of exported settings.",
+    "model": "Model",
+    "modelDesc": "For example deepseek-chat, or the name of a local model. Prefer a fast model without long reasoning.",
+    "save": "Save Router Model",
+    "saving": "Restarting the project…",
+    "saved": "Router model saved",
+    "savedRestart": "Router model saved. Restart OpenAgents to apply it",
+    "saveFailed": "Router model not saved. {{error}}"
   },
   "data": {
     "locationsGroup": "Storage locations",

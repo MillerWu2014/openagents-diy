@@ -26,14 +26,13 @@ export const dmRowId = (agents: readonly string[]) => `dm:${agents[0]},${agents[
 
 // ── Filter tabs ──
 
-export type FilterTab = 'all' | 'channels' | 'starred' | 'archived' | 'dms';
+export type FilterTab = 'all' | 'starred' | 'archived' | 'dms';
 
 // Ordered the way people grow into the product: everything, then 1:1 DMs,
 // then channels, then the bookkeeping views.
 export const TABS: { id: FilterTab; labelKey: MessageKey }[] = [
   { id: 'all', labelKey: 'threads.tabAll' },
   { id: 'dms', labelKey: 'threads.tabDms' },
-  { id: 'channels', labelKey: 'threads.tabChannels' },
   { id: 'starred', labelKey: 'threads.tabStarred' },
   { id: 'archived', labelKey: 'threads.tabArchived' },
 ];

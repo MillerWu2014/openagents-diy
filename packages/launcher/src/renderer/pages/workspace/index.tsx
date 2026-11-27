@@ -7,20 +7,15 @@ import { useWorkspaceTabsStore } from "@renderer/store/workspace-tabs"
 import { useModalOpen } from "@renderer/hooks/useModalOpen"
 import type { ToastType } from "@renderer/hooks/useToast"
 import { WORKSPACE_BUNDLE_MISSING, WORKSPACE_HOME_TAB } from "../../../shared/workspace-view"
-import WelcomePage from "../welcome"
-import { WorkspaceSignIn } from "./sign-in"
 
 /**
- * The Workspace half of the window: Welcome and sign-in while signed out, then a
- * measured native view hosting the web app, including its membership home.
- * Main keeps one view per open tab and swaps them in this same rectangle.
+ * The Workspace half of the window: a measured native view hosting the local
+ * project. No sign-in. Main keeps one view per open tab and swaps them here.
  */
 export default function WorkspacePage(_props: {
   showToast: (msg: string, type?: ToastType) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const account = useAccountStore((s) => s.account)
-  const authMode = useAccountStore((s) => s.authMode)
   const targetSignal = useAccountStore((s) => s.workspaceTargetSignal)
   const hostRef = React.useRef<HTMLDivElement>(null)
   const modalOpen = useModalOpen()
@@ -34,7 +29,7 @@ export default function WorkspacePage(_props: {
 
   React.useEffect(() => {
     const host = hostRef.current
-    if (!host || !account) return
+    if (!host) return
     if (modalOpen) { void window.api.hideWorkspaceView(); return }
     let cancelled = false
     let shown = false
@@ -46,7 +41,7 @@ export default function WorkspacePage(_props: {
       shown = true
       // A workspace asked for from This Computer; otherwise resume the page.
       const target = useAccountStore.getState().workspaceTarget
-      void window.api.showWorkspaceView(target?.slug ?? null, bounds, target?.token ?? null, target?.sessionId ?? null, target?.name ?? null, target?.importAgent ?? null).then(() => {
+      void window.api.showWorkspaceView(target?.slug ?? null, bounds, target?.token ?? null, target?.sessionId ?? null, target?.name ?? null, target?.importAgent ?? null, target?.remote ?? null).then(() => {
         // Loaded: coming back later resumes wherever the user has gone since.
         if (!cancelled && target) useAccountStore.getState().clearWorkspaceTarget()
       }).catch((err: unknown) => {
@@ -65,9 +60,8 @@ export default function WorkspacePage(_props: {
       window.removeEventListener("resize", push)
       void window.api.hideWorkspaceView()
     }
-  }, [account?.email, modalOpen, attempt, targetSignal])
+  }, [modalOpen, attempt, targetSignal])
 
-  if (!account) return authMode === "welcome" ? <WelcomePage /> : <WorkspaceSignIn />
   return <div ref={hostRef} className="relative h-full min-h-0">
     <div className="flex h-full flex-col items-center justify-center gap-3">
       {error === "missing" ? (

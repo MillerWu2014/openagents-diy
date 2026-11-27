@@ -10,9 +10,8 @@ import { WithTooltip } from '@/components/ui/with-tooltip';
 import { SectionHeader } from '@/components/settings/section-chrome';
 import { SettingsCard } from '@/components/settings/settings-card';
 import { SaveButton } from '@/components/settings/save-button';
-import {
-  getAccountProfile, updateAccountProfile, type AccountProfile,
-} from '@/lib/account-api';
+import { workspaceApi } from '@/lib/api';
+import type { AccountProfile } from '@/lib/account-api';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { goToCentralLogin } from '@/lib/auth-redirects';
 import { useT } from '@/lib/i18n';
@@ -49,10 +48,12 @@ type Part = 'avatar' | 'name';
 
 export default function ProfileSettingsPage() {
   const t = useT();
-  const { user, idToken, loading: authLoading, signIn } = useOpenAgentsAuth();
+  const { user, loading: authLoading, signIn } = useOpenAgentsAuth();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<AccountProfile | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
   const [name, setName] = useState('');
   // null = untouched; '' = cleared; 'data:...' = newly picked.
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
@@ -67,18 +68,19 @@ export default function ProfileSettingsPage() {
   }, [justSaved]);
 
   useEffect(() => {
-    if (!idToken) return;
+    if (!user) return;
     let cancelled = false;
-    getAccountProfile(idToken)
+    setFailed(false);
+    workspaceApi.getAccountProfile()
       .then((p) => {
         if (cancelled) return;
         setProfile(p);
         setName(p.displayName || '');
       })
-      .catch(() => { if (!cancelled) toast.error(t('admin.loadFailed')); });
+      .catch(() => { if (!cancelled) { setFailed(true); toast.error(t('admin.loadFailed')); } });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idToken]);
+  }, [user, attempt]);
 
   if (!authLoading && !user) {
     return (
@@ -100,8 +102,15 @@ export default function ProfileSettingsPage() {
 
   if (!profile) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner className="size-5 text-muted-foreground" />
+      <div className="flex flex-col items-center justify-center gap-3 py-16">
+        {failed ? (
+          <>
+            <p className="text-sm text-muted-foreground">{t('admin.loadFailed')}</p>
+            <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>{t('admin.retry')}</Button>
+          </>
+        ) : (
+          <Spinner className="size-5 text-muted-foreground" />
+        )}
       </div>
     );
   }
@@ -127,11 +136,9 @@ export default function ProfileSettingsPage() {
   const avatarDirty = avatarDraft !== null;
 
   const save = async (part: Part) => {
-    if (!idToken) return;
     setSaving(part);
     try {
-      const updated = await updateAccountProfile(
-        idToken,
+      const updated = await workspaceApi.updateAccountProfile(
         part === 'name' ? { displayName: name.trim() } : { avatarUrl: avatarDraft ?? '' },
       );
       setProfile(updated);

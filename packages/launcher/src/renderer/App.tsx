@@ -28,6 +28,7 @@ import { UpdateOfferDialog } from "./components/update-offer/update-offer-dialog
 import { useWhatsNew } from "./components/whats-new/use-whats-new"
 import { InstallMiniBanner } from "./components/install-progress/install-mini-banner"
 import { LauncherUpdateBanner } from "./components/LauncherUpdateBanner"
+import { JoinRemoteDialog } from "./components/workspaces/JoinRemoteProject"
 import { useToasts } from "./hooks/useToast"
 import { useInstallProgress } from "./hooks/useInstallProgress"
 import { useStartupPage } from "./hooks/useStartupPage"
@@ -160,6 +161,7 @@ export default function App(): React.JSX.Element {
       {/* In the Workspace its tab bar carries it; see WorkspaceBar. */}
       {appMode !== "workspace" && <LauncherUpdateBanner />}
       <Toaster position="bottom-right" />
+      <JoinRemoteDialog showToast={showToast} />
       {appMode === "launcher" && <CommandPalette />}
       {appMode === "launcher" && <GuidedTour />}
       <LocalConnectorPrompt />

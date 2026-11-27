@@ -54,13 +54,6 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
           icon: <MessageSquare />,
           count: unreadThreadsTotal,
         },
-    {
-      mode: 'issues',
-      label: t('views.issues'),
-      icon: <CircleDot />,
-      count: unreadIssues,
-      urgent: true,
-    },
     ...(hasAgents
       ? ([
           { mode: 'files', label: t('views.files'), icon: <FileText /> },
@@ -70,20 +63,7 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
             label: t('views.routines'),
             icon: <CalendarClock />,
           },
-          { mode: 'knowledge', label: t('views.knowledge'), icon: <BookOpen /> },
-
-          {
-            mode: 'inbox',
-            label: t('views.inbox'),
-            icon: <Inbox />,
-            count: unreadNotificationCount > 0 ? unreadNotificationCount : undefined,
-          },
           { mode: 'skills', label: t('views.skills'), icon: <Sparkles /> },
-          {
-            mode: 'workflows',
-            label: t('views.workflows'),
-            icon: <Waypoints />,
-          },
           // v1.1 M2: team specialists directory
           { mode: 'agents', label: t('collab.viewAgents'), icon: <Bot /> },
         ] as NavItem[])
@@ -95,14 +75,6 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
       <SidebarGroupLabel>{t('nav.collaboration')}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu className="gap-0.25">
-          {welcomeNavigation.available && <SidebarMenuItem>
-            <SidebarMenuButton isActive={welcome} aria-current={welcome ? 'page' : undefined} onClick={() => {
-              if (welcomeNavigation.open) welcomeNavigation.open(); else openView('connect');
-              onNavigate?.();
-            }}>
-              <Sparkles /><span>{t('nav.welcome')}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>}
           {items.filter((item) => item.mode !== 'agents' || workspace?.settings?.services_enabled === true).map((item) => (
             <SidebarMenuItem key={item.mode}>
               <SidebarMenuButton

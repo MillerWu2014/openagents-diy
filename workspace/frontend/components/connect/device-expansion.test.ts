@@ -9,8 +9,6 @@ import type { WorkspaceAgent, WorkspaceNode } from '@/lib/types';
 
 const api = vi.hoisted(() => ({
   getAgentCatalog: vi.fn(), getCloudProviders: vi.fn(), listCloudAgents: vi.fn(),
-  getHostedProviders: vi.fn(() => Promise.resolve([])), listHostedAgents: vi.fn(() => Promise.resolve([])),
-  listMyAcentaAgents: vi.fn(() => Promise.resolve([])), getMyAcentaUsage: vi.fn(() => Promise.resolve(null)),
   listNodes: vi.fn(), createPairingCode: vi.fn(), getPairingCodeStatus: vi.fn(), sendSetupEmail: vi.fn(),
   isConfigured: () => false,
   listNodeCommands: vi.fn(() => Promise.resolve([])),
@@ -279,7 +277,7 @@ it('applies a new Yumi location choice without replaying the old choice when a c
   expect(container.querySelector('[data-testid="guided-pairing"]')?.getAttribute('data-method')).toBe('terminal');
 });
 
-it('lets desktop users reach Cloud Agents and its hosted agents', async () => {
+it('lets desktop users reach Cloud Agents', async () => {
   fixture.desktop = {
     getComputerStatus: vi.fn(() => Promise.resolve({ hostname: 'mac', deviceType: 'laptop', nodeId: null, warning: false })),
     connectComputer: vi.fn(), openComputer: vi.fn(), signIn: vi.fn(), signOut: vi.fn(),
@@ -290,7 +288,6 @@ it('lets desktop users reach Cloud Agents and its hosted agents', async () => {
   await act(async () => selectTab('connect.tabCloud'));
   expect(button('connect.tabCloud').getAttribute('aria-selected')).toBe('true');
   expect(container.textContent).toContain('connect.cloudMarketplaceTitle');
-  expect(api.getHostedProviders).toHaveBeenCalled();
 });
 
 it('opens on Cloud Agents when asked to', async () => {

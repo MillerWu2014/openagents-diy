@@ -13,7 +13,6 @@ const api = vi.hoisted(() => ({
   enqueueNodeCommand: vi.fn(),
   listNodeCommands: vi.fn(),
   updateMember: vi.fn(),
-  listHostedAgents: vi.fn(),
 }));
 
 const layout = vi.hoisted(() => ({ openEditAgent: vi.fn() }));
@@ -96,7 +95,6 @@ beforeEach(() => {
   api.enqueueNodeCommand.mockReset().mockResolvedValue({ commandId: 'c1' });
   api.listNodeCommands.mockReset().mockResolvedValue([{ commandId: 'c1', status: 'done', result: { ok: true, message: null } }]);
   api.updateMember.mockReset().mockResolvedValue({});
-  api.listHostedAgents.mockReset().mockResolvedValue([]);
   owner.email = 'owner@example.com';
   layout.openEditAgent.mockReset();
   container = document.createElement('div');
@@ -276,16 +274,6 @@ describe('agent device settings', () => {
     expect(document.body.textContent).toContain('C:\\Users\\tester');
     expect(editIn('agents.fieldFolder')).toBeUndefined();
     expect(section('agents.accessTitle')).toBeUndefined();
-  });
-
-  it('shows no folder, key or endpoint for an agent a provider hosts', async () => {
-    api.listHostedAgents.mockResolvedValue([{ agentName: 'codex-demo-key', provider: 'acenta' }]);
-    api.listNodes.mockResolvedValue(onNode({ authMode: 'api_key', apiKeyMasked: 'sk-1...cdef' }));
-    await renderPanel();
-
-    expect(section('agents.fieldFolder')).toBeUndefined();
-    expect(section('agents.accessTitle')).toBeUndefined();
-    expect(document.body.textContent).not.toContain('C:\\Users\\tester');
   });
 
   it('moves a key agent to a custom endpoint with its model', async () => {

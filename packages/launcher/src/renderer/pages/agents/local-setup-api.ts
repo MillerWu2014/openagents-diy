@@ -83,7 +83,9 @@ export function createLocalSetupApi(api: Window["api"], configuration: () => Loc
           if (!existing || existing.type !== type) throw new Error("This agent has changed. Reopen its settings.")
           const changes = Object.fromEntries(Object.entries(values).filter(([key, value]) => (config.initial[key] ?? "") !== value))
           if (Object.keys(changes).length) await api.saveAgentInstanceEnv(name, changes)
-          if (args.workingDir && args.workingDir !== existing.path) await api.setAgentWorkingDir(name, String(args.workingDir))
+          // A joined agent records the folder on its project even when the path
+          // itself did not change, so the next join switches back to it.
+          if (args.workingDir && (args.workingDir !== existing.path || existing.network)) await api.setAgentWorkingDir(name, String(args.workingDir))
         }
         return {}
       } finally { if (!detached) pending.delete(name) }

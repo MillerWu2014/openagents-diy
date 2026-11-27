@@ -1,10 +1,6 @@
 import type { TranslateFn } from '@/lib/i18n';
 
-/** The desktop app's installers, as the pairing page and the add form offer them. */
-export function desktopDownloads(t: TranslateFn): { os: string; href: string; platform: 'macos' | 'windows' }[] {
-  return [
-    { os: 'Windows', platform: 'windows', href: 'https://openagents.org/api/download/launcher/windows' },
-    { os: t('connect.nodeMacSilicon'), platform: 'macos', href: 'https://openagents.org/api/download/launcher/mac' },
-    { os: t('connect.nodeMacIntel'), platform: 'macos', href: 'https://openagents.org/api/download/launcher/mac-intel' },
-  ];
+/** This fork is not published as a download. Callers render nothing. */
+export function desktopDownloads(_t: TranslateFn): { os: string; href: string; platform: 'macos' | 'windows' }[] {
+  return [];
 }

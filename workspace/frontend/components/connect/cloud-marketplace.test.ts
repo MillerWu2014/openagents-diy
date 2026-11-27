@@ -7,8 +7,6 @@ import { ConnectAgentView } from './connect-agent-view';
 const api = vi.hoisted(() => ({
   getAgentCatalog: vi.fn(), getCloudProviders: vi.fn(), listCloudAgents: vi.fn(),
   modelProbe: vi.fn(), addCloudAgent: vi.fn(),
-  getHostedProviders: vi.fn(() => Promise.resolve([])), listHostedAgents: vi.fn(() => Promise.resolve([])),
-  listMyAcentaAgents: vi.fn(() => Promise.resolve(null)), getMyAcentaUsage: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock('@/lib/api', () => ({ workspaceApi: api }));
 vi.mock('@/lib/workspace-context', () => ({ useWorkspace: () => ({
@@ -46,7 +44,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it('offers only Acenta on the cloud agents page, not the other cloud providers', () => {
+it('does not list the other cloud providers on the cloud agents page', () => {
   expect(container.textContent).toContain('connect.cloudMarketplaceTitle');
   for (const name of ['perplexity', 'manus', 'tokenpay', 'sensenova']) {
     expect([...container.querySelectorAll('button')].some((b) => b.textContent?.includes(name))).toBe(false);

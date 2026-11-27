@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, History, Lock, Globe } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from '@/components/ui/field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -48,27 +47,23 @@ interface NewThreadDialogProps {
   agents: WorkspaceAgent[];
   sessions?: WorkspaceSession[];
   teammates?: TeamMember[];
-  /** Start with "Make it a channel" switched on (opened from a New channel button). */
-  defaultAsChannel?: boolean;
-  onCreateThread: (opts: { title?: string; participants: string[]; humanParticipants: string[]; resumeFrom?: string; visibility: ThreadVisibility; asChannel: boolean }) => Promise<void>;
+  onCreateThread: (opts: { title?: string; participants: string[]; humanParticipants: string[]; resumeFrom?: string; visibility: ThreadVisibility }) => Promise<void>;
 }
 
-export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammates = [], defaultAsChannel = false, onCreateThread }: NewThreadDialogProps) {
+export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammates = [], onCreateThread }: NewThreadDialogProps) {
   const t = useT();
-  // Only show online agents in the picker
+  // Every agent in the project can join a session. Online is not required:
+  // an agent that was just added is still connecting, and the session waits for it.
   const availableAgents = agents.filter(a => !a.builtin && a.canStartThread !== false);
-  const onlineAgents = availableAgents.filter((a) => a.status === 'online');
-  const offlineAgentCount = availableAgents.length - onlineAgents.length;
-  // Personal assistants are only available through direct conversations.
-  const agentNames = onlineAgents.map((a) => a.agentName);
-  const bulkNames = onlineAgents.filter((a) => !a.builtin).map((a) => a.agentName);
+  const offlineAgentCount = availableAgents.filter((a) => a.status !== 'online').length;
+  const agentNames = availableAgents.map((a) => a.agentName);
+  const bulkNames = availableAgents.filter((a) => !a.builtin).map((a) => a.agentName);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [resumeFrom, setResumeFrom] = useState<string>(NO_RESUME);
   // v1.1 permission model: threads are private by default; Public is opt-in.
   const [visibility, setVisibility] = useState<ThreadVisibility>('private');
   const [selectedPeople, setSelectedPeople] = useState<Set<string>>(new Set());
-  const [asChannel, setAsChannel] = useState(defaultAsChannel);
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +75,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
       kind: 'human' as const, id: person.email,
       label: person.displayName || person.email, detail: person.displayName ? person.email : '',
     })),
-    ...onlineAgents.map((agent) => ({
+    ...availableAgents.map((agent) => ({
       kind: 'agent' as const, id: agent.agentName,
       label: agentLabel(agent), detail: t('newThread.agent'),
     })),
@@ -95,15 +90,14 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
     });
   };
 
-  // Reset state when dialog opens. When there's exactly one online agent,
-  // pre-select it so the common single-agent case is a one-click "Start Thread".
+  // Reset state when dialog opens. When the project has exactly one agent,
+  // pre-select it so starting a session is one click.
   useEffect(() => {
     if (open) {
-      setSelected(onlineAgents.length === 1 ? new Set([onlineAgents[0].agentName]) : new Set());
+      setSelected(availableAgents.length === 1 ? new Set([availableAgents[0].agentName]) : new Set());
       setResumeFrom(NO_RESUME);
       setVisibility('private');
       setSelectedPeople(new Set());
-      setAsChannel(defaultAsChannel);
       setTitle('');
       setError(null);
     }
@@ -120,7 +114,6 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
         humanParticipants: teammates.filter((p) => selectedPeople.has(p.email)).map((p) => p.email),
         resumeFrom: hasClaudeAgent && resumeFrom !== NO_RESUME ? resumeFrom : undefined,
         visibility,
-        asChannel,
       });
       onOpenChange(false);
     } catch {
@@ -136,7 +129,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
   );
 
   // Check if any selected agent is a Claude Code agent (heuristic: agent type or name contains 'claude')
-  const hasClaudeAgent = onlineAgents.some(
+  const hasClaudeAgent = availableAgents.some(
     (a) => selected.has(a.agentName) && /claude/i.test(a.agentName)
   );
 
@@ -146,7 +139,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
           scrolling agent list, so it goes a step wider again. */}
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-xl">{t(asChannel ? 'newThread.channelTitle' : 'newThread.title')}</DialogTitle>
+          <DialogTitle className="text-xl">{t('newThread.title')}</DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
             {t('newThread.descriptionMulti')}
           </DialogDescription>
@@ -233,16 +226,6 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
               ))}
             </RadioGroup>
           </FieldSet>
-          {/* A channel is a long-running thread, pinned under the Channels tab. */}
-          <FieldLabel htmlFor="new-thread-as-channel">
-            <Field orientation="horizontal">
-              <FieldContent>
-                <FieldTitle>{t('newThread.asChannel')}</FieldTitle>
-                <FieldDescription>{t('newThread.asChannelHint')}</FieldDescription>
-              </FieldContent>
-              <Switch id="new-thread-as-channel" checked={asChannel} disabled={creating} onCheckedChange={setAsChannel} />
-            </Field>
-          </FieldLabel>
           {error && (
             <Alert variant="destructive">
               <AlertCircle />
@@ -256,7 +239,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
             {t('common.cancel')}
           </Button>
           <Button className="min-w-24" onClick={handleCreate} disabled={!canCreate}>
-            {hasClaudeAgent && resumeFrom !== NO_RESUME ? t('newThread.resume') : t(asChannel ? 'newThread.startChannel' : 'newThread.start')}
+            {hasClaudeAgent && resumeFrom !== NO_RESUME ? t('newThread.resume') : t('newThread.start')}
           </Button>
         </DialogFooter>
       </DialogContent>

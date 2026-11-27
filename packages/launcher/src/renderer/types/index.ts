@@ -626,6 +626,7 @@ declare global {
       renameAgent(name: string, displayName: string): Promise<unknown>
       updateAgent(name: string, config: unknown): Promise<unknown>
       setAgentWorkingDir(name: string, dir: string): Promise<{ success: boolean; path?: string }>
+      createLocalProject(input: { name: string; directory: string; agents: string[] }): Promise<{ slug: string; name: string; token: string }>
       startAgent(name: string): Promise<unknown>
       stopAgent(name: string): Promise<unknown>
       startAll(): Promise<unknown>
@@ -967,7 +968,17 @@ declare global {
         title?: string | null,
         /** Open "Import past sessions" for this agent once the workspace loads. */
         importAgent?: string | null,
+        joined?: { apiUrl: string; memberToken: string } | null,
       ): Promise<void>
+      joinRemoteProject(input: {
+        link?: string
+        host?: string
+        port?: number
+        code?: string
+        displayName: string
+      }): Promise<{ slug: string; workspaceName: string; apiUrl: string; memberToken: string }>
+      pendingJoin(): Promise<{ host: string; port: number; code: string } | null>
+      onJoinRequest(cb: (target: { host: string; port: number; code: string }) => void): () => void
       setWorkspaceViewBounds(bounds: ViewBounds): Promise<void>
       /** Push the launcher's theme/language to the hosted workspace. */
       syncAppearance(next: { theme: string; language: string }): Promise<void>

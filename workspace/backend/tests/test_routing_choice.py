@@ -59,6 +59,19 @@ def test_sender_can_assign_once_with_original_context(client, workspace, thread,
     assert db.get(EventRecord, event['id']).metadata_['routing_choice']['status'] == 'assigned'
 
 
+def test_workspace_token_assigns_as_the_message_sender(client, workspace, thread, db):
+    event = post(client, workspace, thread)
+    with patch('app.services.cloud_agent.invoke_cloud_agents'):
+        response = client.post(
+            f"/v1/events/{event['id']}/routing?network={workspace['id']}",
+            headers={"X-Workspace-Token": workspace["token"]},
+            json={"agent": "agent-beta"},
+        )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["status"] == "assigned"
+    assert response.json()["data"]["agent"] == "agent-beta"
+
+
 def test_other_human_cannot_resolve_or_dismiss(client, workspace, thread):
     event = post(client, workspace, thread)
     for agent in ('agent-beta', None):
@@ -207,3 +220,44 @@ def test_reclassify_checks_current_eligibility(client, workspace, thread, db, ch
         response = reclassify(client, workspace, event, user='ben' if change == 'other-sender' else 'ann')
         assert response.status_code == code, response.text
         invoke.assert_not_called()
+
+
+def say(client, ws, thread, source, content, headers=None):
+    response = client.post('/v1/events', headers=headers or {'X-Workspace-Token': ws['token']}, json={
+        'network': ws['id'], 'type': 'workspace.message.posted', 'source': source,
+        'target': f'channel/{thread.name}', 'payload': {'content': content},
+    })
+    assert response.status_code == 200, response.text
+    return response.json()['data']['metadata']
+
+
+def test_without_a_model_the_lead_agent_takes_unaddressed_messages(client, workspace, thread, db):
+    thread.master_agent = 'agent-alpha'
+    db.commit()
+    meta = say(client, workspace, thread, 'human:spoof', 'Publish this blog', _bearer('ann'))
+    assert meta['target_agents'] == ['agent-alpha']
+    assert 'routing_choice' not in meta
+
+
+def test_a_configured_model_is_preferred_over_the_lead_agent(client, workspace, thread, db, monkeypatch):
+    thread.master_agent = 'agent-alpha'
+    db.commit()
+    monkeypatch.setattr(config, 'ROUTER_LLM_ENABLED', True)
+    monkeypatch.setattr(config, 'ROUTER_LLM_API_KEY', 'key')
+
+    async def model(*args, **kwargs):
+        return ['agent-beta']
+    monkeypatch.setattr('app.mods.workspace_mod._route_with_llm', model)
+    meta = say(client, workspace, thread, 'human:spoof', 'Publish this blog', _bearer('ann'))
+    assert meta['target_agents'] == ['agent-beta']
+
+
+def test_an_agent_reply_hands_off_only_by_a_leading_mention(client, workspace, thread, db):
+    thread.master_agent = 'agent-alpha'
+    db.commit()
+    passing = say(client, workspace, thread, 'openagents:agent-beta', 'Done. Thanks @agent-alpha for the draft.')
+    assert passing['target_agents'] == ['__no_response__']
+    plain = say(client, workspace, thread, 'openagents:agent-beta', 'Done.')
+    assert plain['target_agents'] == ['__no_response__']
+    leading = say(client, workspace, thread, 'openagents:agent-beta', '@agent-alpha please review the draft.')
+    assert leading['target_agents'] == ['agent-alpha']

@@ -197,10 +197,18 @@
     "toast": {
       "connecting": "Adding {{name}} to the workspace…",
       "connectedTo": "Joined {{slug}}",
+      "created": "Project created",
       "error": "Error: {{message}}"
     },
-    "emptyTitle": "This device isn't in any workspace yet",
-    "getCode": "Get a pairing code to join a workspace",
+    "emptyTitle": "Join a project on this computer",
+    "joinLocal": "Join {{name}}",
+    "createLocal": "New Project",
+    "namePlaceholder": "Project name",
+    "folderLabel": "Project folder",
+    "folderBrowse": "Choose Folder",
+    "folderPlaceholder": "Choose a folder on this computer",
+    "agentsLabel": "Agents",
+    "agentsEmpty": "No agents on this computer yet",
     "pickHint": "Choose the workspace this agent should join.",
     "connect": "Connect",
     "pairToggle": "Join with a pairing code",
@@ -391,6 +399,7 @@
     "installAndSignIn": "Install and sign in",
     "agentUnavailable": "This agent is no longer available. Return to the agent list.",
     "folderHint": "Defaults to your home folder. Choose a project folder for this agent’s work.",
+    "projectFolderHint": "This folder belongs to the current project. Every session in the project runs here.",
     "workdirOptional": "Working directory (optional)",
     "homeFolder": "Your home folder",
     "recommended": {

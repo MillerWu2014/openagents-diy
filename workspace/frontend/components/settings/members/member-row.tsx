@@ -42,7 +42,9 @@ export function MemberRow({
           <span className="truncate">{m.displayName || m.email}</span>
           {isSelf && <span className="text-xs font-normal text-muted-foreground">({t('admin.you')})</span>}
         </ItemTitle>
-        {m.displayName && <ItemDescription className="line-clamp-1 text-xs">{m.email}</ItemDescription>}
+        {m.displayName && !m.email.endsWith('@members.local') && (
+          <ItemDescription className="line-clamp-1 text-xs">{m.email}</ItemDescription>
+        )}
       </ItemContent>
       <ItemActions>
         {editable ? (

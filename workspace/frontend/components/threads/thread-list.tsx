@@ -2,8 +2,7 @@
 
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
-import { Plus } from 'lucide-react';
-import { channelSessions, isIssueWorkSession, isRoutineSession, mergeConversationRows, sessionActivityTime, type ConversationRow } from '@/lib/conversation-list';
+import { isIssueWorkSession, isRoutineSession, mergeConversationRows, sessionActivityTime, type ConversationRow } from '@/lib/conversation-list';
 import { agentLabel } from '@/lib/helpers';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -24,7 +23,7 @@ import { buildThreadPreview } from './thread-preview';
 import { ThreadRow } from './thread-row';
 import { ThreadRowMenu } from './thread-row-menu';
 import { useThreadProjectActions } from './use-thread-project-actions';
-import { MoveToProjectMenu, ProjectPersonalHint, startThreadDrag, ThreadProjectBar, ThreadProjectGroup, ThreadProjectLayoutToggle } from './thread-projects';
+import { MoveToProjectMenu, startThreadDrag } from './thread-projects';
 import { useThreadSearch, useThreadShortcuts } from './use-thread-list-input';
 import { TABS, dmDedupKey, dmDisplayTitle, dmRowId, highlightMatch, type FilterTab, type SortOrder } from './thread-list-utils';
 import { threadPrivacyApplies } from '@/components/chat/thread-privacy-control';
@@ -38,7 +37,7 @@ export function ThreadList() {
   } = useWorkspace();
   const me = myAddress(currentUser);
   const humanNames = useHumanNames();
-  const { isMobile, openMobileDetail, openNewThread, openNewChannel, threadFilter: filter, setThreadFilter: setFilter, setSelectedAgentName } = useLayout();
+  const { isMobile, openMobileDetail, openNewThread, threadFilter: filter, setThreadFilter: setFilter, setSelectedAgentName } = useLayout();
   const t = useT();
   const { timeAgo } = useFormatters();
 
@@ -61,17 +60,15 @@ export function ThreadList() {
       });
   }, [sessions, currentSessionId, sortOrder]);
 
-  const { projectModel, projectCounts, createProject, renameProject, removeProject } = useThreadProjectActions({
+  const { projectModel, createProject } = useThreadProjectActions({
     workspaceId: workspace?.workspaceId || '',
     userId: currentUser.id,
     sessions: sortedSessions,
     setFilter,
     setSearchQuery,
   });
-  const grouped = projectModel.grouped && !isSearching && filter !== 'dms';
 
   const activeSessions = useMemo(() => sortedSessions.filter((s) => s.status === 'active'), [sortedSessions]);
-  const channels = useMemo(() => channelSessions(sortedSessions), [sortedSessions]);
   const starredSessions = useMemo(() => activeSessions.filter((s) => s.starred), [activeSessions]);
   const archivedSessions = useMemo(() => sortedSessions.filter((s) => s.status === 'archived'), [sortedSessions]);
 
@@ -92,12 +89,10 @@ export function ThreadList() {
   // While searching, the query spans every thread regardless of the active tab
   const tabSessions = isSearching
     ? sortedSessions.filter((s) => s.title?.toLowerCase().includes(searchQuery.toLowerCase()) || hitsByChannel.has(s.sessionId))
-    : filter === 'channels' ? channels
     : filter === 'starred' ? starredSessions
     : filter === 'archived' ? archivedSessions
     : activeSessions;
-  const visibleSessions = isSearching || projectModel.selected === 'all' ? tabSessions
-    : tabSessions.filter(s => (projectModel.assignments[s.sessionId] || 'unorganized') === projectModel.selected);
+  const visibleSessions = tabSessions;
 
   const dmTitle = (convo: DMConversation) => {
     const counterpart = dmCounterpart(convo.agents, me);
@@ -107,27 +102,25 @@ export function ThreadList() {
     const agent = agents.find(a => a.agentName === name);
     return agent ? agentLabel(agent) : humanNames[name.toLowerCase()] || name;
   };
-  const matchingDMs = !isSearching && projectModel.selected !== 'all' ? [] : isSearching ? visibleDMs.filter(c =>
+  const matchingDMs = isSearching ? visibleDMs.filter(c =>
     `${dmTitle(c)} ${c.agents.join(' ')} ${c.lastMessage.content}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     hitsByChannel.has(dmRowId(c.agents))) : visibleDMs;
   const allRows = mergeConversationRows(visibleSessions, matchingDMs, sortOrder, dmTitle);
   const sortedDMRows = mergeConversationRows([], matchingDMs, sortOrder, dmTitle);
   const starredRows = mergeConversationRows(visibleSessions, matchingDMs.filter(dm => dm.starred), sortOrder, dmTitle);
-  const shortcutIds = isSearching || grouped ? [] : filter === 'all' ? allRows.map(r => r.id)
+  const shortcutIds = isSearching ? [] : filter === 'all' ? allRows.map(r => r.id)
     : filter === 'dms' ? sortedDMRows.map(r => r.id) : filter === 'starred' ? starredRows.map(r => r.id) : visibleSessions.map(s => s.sessionId);
 
-  const inProject = (s: WorkspaceSession) => projectModel.selected === 'all' || (projectModel.assignments[s.sessionId] || 'unorganized') === projectModel.selected;
-  const unreadThreadCount = activeSessions.filter((s) => inProject(s) && unreadSessionIds.has(s.sessionId)).length;
-  const unreadDmCount = (projectModel.selected === 'all' ? visibleDMs : []).filter((c) => unreadDmSessionIds.has(dmRowId(c.agents))).length;
+  const unreadThreadCount = activeSessions.filter((s) => unreadSessionIds.has(s.sessionId)).length;
+  const unreadDmCount = visibleDMs.filter((c) => unreadDmSessionIds.has(dmRowId(c.agents))).length;
   const unreadCount = unreadThreadCount + unreadDmCount;
 
   // All and DMs count what's unread (Slack-style), hidden at zero; Starred and
   // Archived keep their totals.
   const tabCount: Record<FilterTab, number | undefined> = {
     all: unreadCount,
-    channels: channels.filter((s) => inProject(s) && unreadSessionIds.has(s.sessionId)).length,
-    starred: starredSessions.filter(inProject).length + (projectModel.selected === 'all' ? visibleDMs : []).filter(dm => dm.starred).length,
-    archived: archivedSessions.filter(inProject).length,
+    starred: starredSessions.length + visibleDMs.filter(dm => dm.starred).length,
+    archived: archivedSessions.length,
     dms: unreadDmCount,
   };
 
@@ -162,7 +155,7 @@ export function ThreadList() {
           displayTime={activityMs ? timeAgo(new Date(activityMs).toISOString()) : session.createdAt ? timeAgo(session.createdAt) : ''}
           // Hidden while searching: the rendered list reorders but the 1-9
           // handler still operates on activeSessions.
-          shortcutKey={!isSearching && !grouped && !muted && idx + offset < 9 ? idx + offset + 1 : null}
+          shortcutKey={!isSearching && !muted && idx + offset < 9 ? idx + offset + 1 : null}
           title={isSearching ? highlightMatch(session.title || t('threads.untitled'), searchQuery) : (session.title || t('threads.untitled'))}
           muted={muted}
           onSelect={() => selectSession(session.sessionId)}
@@ -201,7 +194,7 @@ export function ThreadList() {
       <DmRow
         key={dmRowId(convo.agents)}
         convo={convo}
-        shortcutKey={!isSearching && !grouped && idx + offset < 9 ? idx + offset + 1 : null}
+        shortcutKey={!isSearching && idx + offset < 9 ? idx + offset + 1 : null}
         onlinePeople={onlinePeople}
         pendingDm={pendingDm}
         onSelect={selectSession}
@@ -209,19 +202,8 @@ export function ThreadList() {
       />
     ));
 
-  const renderConversations = (rows: ConversationRow[], muted = false) => {
-    if (!grouped) return rows.map((row, index) => row.kind === 'thread' ? renderSessionRows([row.thread], muted, index) : renderDMRows([row.dm], index));
-    const groups = [...projectModel.projects, { id: 'unorganized', name: t('threadProjects.unorganized'), color: 4 }].filter(p => projectModel.selected === 'all' || p.id === projectModel.selected);
-    return <>
-      {groups.map(project => {
-        const threads = rows.filter((row): row is Extract<ConversationRow, { kind: 'thread' }> => row.kind === 'thread' && (projectModel.assignments[row.id] || 'unorganized') === project.id).map(row => row.thread);
-        if (project.id === 'unorganized' && !threads.length && projectModel.selected !== 'unorganized') return null;
-        const projectIndex = projectModel.projects.findIndex(p => p.id === project.id);
-        return <ThreadProjectGroup onReorder={projectIndex < 0 ? undefined : (id, placement) => projectModel.reorder(id, project.id, placement)} onMoveUp={projectIndex > 0 ? () => projectModel.moveOrder(project.id, -1) : undefined} onMoveDown={projectIndex >= 0 && projectIndex < projectModel.projects.length - 1 ? () => projectModel.moveOrder(project.id, 1) : undefined} key={project.id} project={project} count={threads.length} unread={threads.filter(s => unreadSessionIds.has(s.sessionId)).length} collapsed={projectModel.collapsed.includes(project.id)} onToggle={() => projectModel.toggle(project.id)} onDrop={id => { if (sortedSessions.some(s => s.sessionId === id)) projectModel.move(id, project.id === 'unorganized' ? null : project.id); }} onRename={project.id === 'unorganized' ? undefined : () => void renameProject(project)} onRemove={() => void removeProject(project)}>{renderSessionRows(threads, muted)}</ThreadProjectGroup>;
-      })}
-      {rows.some(row => row.kind === 'dm') && <div className="mb-2"><p className="px-3 py-3 text-xs font-semibold text-muted-foreground">{t('threads.tabDms')}</p>{rows.flatMap(row => row.kind === 'dm' ? renderDMRows([row.dm]) : [])}</div>}
-    </>;
-  };
+  const renderConversations = (rows: ConversationRow[], muted = false) =>
+    rows.map((row, index) => row.kind === 'thread' ? renderSessionRows([row.thread], muted, index) : renderDMRows([row.dm], index));
 
   const emptyState = (tab: FilterTab) => (
     <ThreadListEmpty
@@ -229,7 +211,6 @@ export function ThreadList() {
       isSearching={isSearching}
       onClearSearch={() => setSearchQuery('')}
       onNewThread={openNewThread}
-      onNewChannel={openNewChannel}
     />
   );
 
@@ -244,14 +225,10 @@ export function ThreadList() {
 
       <div className="flex shrink-0 items-center gap-1 px-3 pt-2 pb-1">
         <ThreadSearch inline value={searchQuery} searching={searching} onChange={setSearchQuery} />
-        <ThreadConversationFilter value={isSearching ? 'all' : filter} counts={tabCount} disabled={isSearching} onChange={value => { setFilter(value); if (value === 'dms') projectModel.select('all'); }} />
+        <ThreadConversationFilter value={isSearching ? 'all' : filter} counts={tabCount} disabled={isSearching} onChange={setFilter} />
       </div>
 
       {isSearching && <p className="px-4 pb-2 text-xs text-muted-foreground">{t('threadProjects.searchAll')}</p>}
-      <div className="flex shrink-0 items-center gap-1 border-b border-border/60 px-3 pt-0.5 pb-2">
-        <ThreadProjectBar model={{ ...projectModel, select: id => { projectModel.select(id); if (filter === 'dms') setFilter('all'); } }} counts={projectCounts} onCreate={() => void createProject()} />
-        <ThreadProjectLayoutToggle grouped={projectModel.grouped} onChange={projectModel.setGrouped} />
-      </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
         {TABS.filter(tab => tab.id === (isSearching ? 'all' : filter)).map((tab) => (
@@ -261,7 +238,7 @@ export function ThreadList() {
                 collided with the scrollbar. */}
             <ScrollArea className="h-full" viewportClassName="px-2 [&>div]:flex! [&>div]:min-h-full [&>div]:flex-col">
               {tab.id === 'all' ? (
-                allRows.length === 0 && !(grouped && projectModel.projects.length) ? emptyState('all') : renderConversations(allRows)
+                allRows.length === 0 ? emptyState('all') : renderConversations(allRows)
               ) : tab.id === 'dms' ? (
                 <>
                   {!isSearching && <NewDmMenu agents={agents} people={me === LEGACY_HUMAN ? [] : dmPeople} onStart={startDM} />}
@@ -269,16 +246,6 @@ export function ThreadList() {
                 </>
               ) : tab.id === 'starred' ? (
                 starredRows.length === 0 ? emptyState('starred') : renderConversations(starredRows)
-              ) : tab.id === 'channels' && visibleSessions.length > 0 && !isSearching ? (
-                <>
-                  <div className="flex px-1 py-2">
-                    <Button variant="outline" size="sm" onClick={openNewChannel}>
-                      <Plus data-icon="inline-start" />
-                      {t('threads.newChannel')}
-                    </Button>
-                  </div>
-                  {renderConversations(mergeConversationRows(visibleSessions, [], sortOrder, dmTitle))}
-                </>
               ) : visibleSessions.length === 0 ? (
                 emptyState(tab.id)
               ) : (
@@ -288,7 +255,6 @@ export function ThreadList() {
           </div>
         ))}
       </div>
-      <ProjectPersonalHint />
     </div>
   );
 }

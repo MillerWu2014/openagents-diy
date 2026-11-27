@@ -20,9 +20,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@rende
  * English, and the box shows the END of the path while it is not being
  * edited: the folder's own name, not "/Users/…" that every path starts with.
  */
-export function SetupWorkdirField({ value, onChange }: {
+export function SetupWorkdirField({ value, onChange, hint }: {
   value: string
   onChange: (value: string) => void
+  hint?: string
 }): React.JSX.Element {
   const { t } = useTranslation()
   const input = useRef<HTMLInputElement>(null)
@@ -54,7 +55,7 @@ export function SetupWorkdirField({ value, onChange }: {
           </Tooltip>
         </TooltipProvider>
       </div>
-      <FieldDescription>{t("agents.shared.folderHint")}</FieldDescription>
+      <FieldDescription>{hint || t("agents.shared.folderHint")}</FieldDescription>
     </Field>
   )
 }

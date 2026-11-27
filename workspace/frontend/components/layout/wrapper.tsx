@@ -16,9 +16,8 @@ import { ArtifactSplitView } from './artifact-split-view';
 import { AppHeader } from './app-header';
 import { OnboardingSurfaceContext } from './onboarding-surface';
 import { MobileShell } from './mobile-shell';
-import { ImportSessionsHost } from '@/components/agents/import-sessions-host';
 import { WorkspaceTour } from '@/components/tours/workspace-tour';
-import { useLayout, RAIL_WIDTH_COLLAPSED, RAIL_WIDTH_EXPANDED } from './layout-context';
+import { useLayout, RAIL_WIDTH_COLLAPSED } from './layout-context';
 import { cn } from '@/lib/utils';
 import { hasAddedWorkspaceAgent, shouldOpenFirstRunOnboarding } from '@/lib/first-run-entry';
 import { RoutineList } from '@/components/routines/routine-list';
@@ -27,14 +26,9 @@ import { FilePreview } from '@/components/files/file-preview';
 import { TrashView } from '@/components/files/trash-view';
 import { BrowserView } from '@/components/browser/browser-view';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
-import { FirstRunOnboarding } from '@/components/connect/first-run-onboarding';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
-import { IssuesView } from '@/components/issues/issues-view';
-import { WorkflowsView } from '@/components/workflows/workflows-view';
 import { SkillsView } from '@/components/skills/skills-view';
-import { InboxView } from '@/components/inbox/inbox-view';
-import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { AgentDirectoryView } from '@/components/agents/agent-directory-view';
  // v1.1 M2
 import { useWorkspace } from '@/lib/workspace-context';
@@ -57,7 +51,7 @@ export function Wrapper() {
   useLandingNote();
   const {
     isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, setSidebarOpen,
-    hasListPanel, mobilePane, splitBrowser, showBrowserPreview, isRailExpanded, conversationWidth, setConversationWidth,
+    hasListPanel, mobilePane, splitBrowser, showBrowserPreview, isRailExpanded, railExpandedWidth, railDragWidth, railResizing, conversationWidth, setConversationWidth,
     filesSection, selectedAgentName, setSelectedAgentName, openView, connectSetupRequest,
   } = useLayout();
 
@@ -98,9 +92,8 @@ export function Wrapper() {
     const update = async () => {
       const url = new URL(window.location.href);
       const workspaceSlug = decodeURIComponent(url.pathname.split('/')[1]);
-      if (viewMode === 'issues') return;
-      if (viewMode === 'files' || viewMode === 'knowledge') {
-        url.pathname = resourcePath(workspaceSlug, viewMode, viewMode === 'files' ? selectedFileId : selectedKnowledgeId);
+      if (viewMode === 'files') {
+        url.pathname = resourcePath(workspaceSlug, viewMode, selectedFileId);
       } else if (viewMode === 'threads' && currentSessionId) {
         try {
           const link = await workspaceApi.getThreadLink(currentSessionId);
@@ -168,10 +161,7 @@ export function Wrapper() {
     } catch { /* Private browsing still gets setup once per mounted workspace. */ }
     openView('connect');
   }, [loading, workspaceLoadError, workspace, currentUser.id, hasAgents, userSessions.length, currentSessionId, viewMode, openView]);
-  const showOnboarding =
-    !onboardingDismissed && viewMode === 'connect' &&
-    (forceWelcome || !connectSetupRequest) &&
-    (previewWelcome || !hasAgents);
+  const showOnboarding = false;
 
   const dismissOnboarding = () => {
     setOnboardingDismissed(true);
@@ -192,7 +182,6 @@ export function Wrapper() {
         welcomeActive={welcomeActive} onWelcomeChange={setWelcomeActive} previewWelcome={previewWelcome}
         welcomeAvailable={welcomeAvailable} openWelcome={openWelcome} openConnect={openConnect} welcomeKey={welcomeKey}
         forceWelcome={forceWelcome} onWelcomeComplete={finishWelcome} />
-      <ImportSessionsHost />
     </>;
   }
 
@@ -211,7 +200,7 @@ export function Wrapper() {
 
   // The shell sizes itself: rail width plus the list panel when it is showing.
   // Expanding the rail to show labels widens the shell by the same amount.
-  const railWidth = isRailExpanded ? RAIL_WIDTH_EXPANDED : RAIL_WIDTH_COLLAPSED;
+  const railWidth = railDragWidth ?? (isRailExpanded ? railExpandedWidth : RAIL_WIDTH_COLLAPSED);
   const shellWidth = railWidth + (sidebarOpen ? 388 : 0);
 
   // On a computer a narrow window stays the desktop shell: one narrower than
@@ -226,7 +215,10 @@ export function Wrapper() {
     <SidebarProvider
       open={sidebarOpen}
       onOpenChange={setSidebarOpen}
-      className="relative h-full min-h-0 bg-sidebar [&_.container-fluid]:px-5"
+      className={cn(
+        'relative h-full min-h-0 bg-sidebar [&_.container-fluid]:px-5',
+        railResizing && '[&_[data-slot=sidebar-gap]]:transition-none [&_[data-slot=sidebar-container]]:transition-none',
+      )}
       style={{
         minWidth: WORKSPACE_MIN_WIDTH,
         '--sidebar-width': `${shellWidth}px`,
@@ -248,13 +240,7 @@ export function Wrapper() {
       >
         {!showOnboarding && viewMode !== 'connect' && <AppHeader />}
         <div className="relative flex min-h-0 grow overflow-hidden">
-          {showOnboarding ? (
-            /* Guided first-agent setup owns the full Connect Agent surface. */
-            <div className="relative flex-1 min-w-0 overflow-hidden bg-background">
-              <FirstRunOnboarding key={welcomeKey} onDismiss={dismissOnboarding} onWelcomeChange={setWelcomeActive}
-                previewWelcome={previewWelcome} forceWelcome={forceWelcome} onWelcomeComplete={finishWelcome} />
-            </div>
-          ) : viewMode === 'threads' && monitorMode ? (
+          {viewMode === 'threads' && monitorMode ? (
             /* Monitor mode: 2x3 grid over the whole detail area */
             <div className="relative flex-1 min-w-0">
               <MonitorGrid />
@@ -295,12 +281,8 @@ export function Wrapper() {
               )}
               {visitedViews.current.has('browser') && <Activity mode={viewMode === 'browser' ? 'visible' : 'hidden'}><BrowserView /></Activity>}
               {visitedViews.current.has('connect') && <Activity mode={viewMode === 'connect' ? 'visible' : 'hidden'}><ConnectAgentView /></Activity>}
-              {visitedViews.current.has('issues') && <Activity mode={viewMode === 'issues' ? 'visible' : 'hidden'}><IssuesView /></Activity>}
-              {visitedViews.current.has('workflows') && <Activity mode={viewMode === 'workflows' ? 'visible' : 'hidden'}><WorkflowsView /></Activity>}
-              {visitedViews.current.has('inbox') && <Activity mode={viewMode === 'inbox' ? 'visible' : 'hidden'}><InboxView /></Activity>}
               {visitedViews.current.has('skills') && <Activity mode={viewMode === 'skills' ? 'visible' : 'hidden'}><SkillsView /></Activity>}
               {visitedViews.current.has('agents') && <Activity mode={viewMode === 'agents' ? 'visible' : 'hidden'}><AgentDirectoryView /></Activity>}
-              {visitedViews.current.has('knowledge') && <Activity mode={viewMode === 'knowledge' ? 'visible' : 'hidden'}><KnowledgeView /></Activity>}
 
               {/* Agent profile slide-over (non-chat views keep the overlay) */}
               {isAgentPanelOpen && viewMode !== 'threads' && <AgentProfilePanel />}
@@ -310,7 +292,6 @@ export function Wrapper() {
       </SidebarInset>
 
       <NewThreadDialogHost />
-      <ImportSessionsHost />
       {/* Runs once by itself, on a workspace that is set up: an agent added
           and no first-run setup on screen. The user menu reopens it. */}
       <WorkspaceTour autoStart={hasAgents && !showOnboarding && viewMode === 'threads'} />

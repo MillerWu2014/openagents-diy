@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('agents:rename', name, displayName),
   updateAgent: (name: string, config: unknown) => ipcRenderer.invoke('agents:update', name, config),
   setAgentWorkingDir: (name: string, dir: string) => ipcRenderer.invoke('agents:set-workdir', name, dir),
+  createLocalProject: (input: { name: string; directory: string; agents: string[] }) =>
+    ipcRenderer.invoke('agents:create-local-project', input),
 
   startAgent: (name: string) => ipcRenderer.invoke('agents:start', name),
   stopAgent: (name: string) => ipcRenderer.invoke('agents:stop', name),
@@ -320,7 +322,16 @@ contextBridge.exposeInMainWorld('api', {
     sessionId?: string | null,
     title?: string | null,
     importAgent?: string | null,
-  ) => ipcRenderer.invoke('workspace-view:show', target, bounds, token, sessionId, title, importAgent),
+    joined?: { apiUrl: string; memberToken: string } | null,
+  ) => ipcRenderer.invoke('workspace-view:show', target, bounds, token, sessionId, title, importAgent, joined),
+  joinRemoteProject: (input: { link?: string; host?: string; port?: number; code?: string; displayName: string }) =>
+    ipcRenderer.invoke('project:join-remote', input),
+  pendingJoin: () => ipcRenderer.invoke('project:pending-join'),
+  onJoinRequest: (cb: (target: { host: string; port: number; code: string }) => void) => {
+    const handler = (_e: unknown, target: { host: string; port: number; code: string }): void => cb(target)
+    ipcRenderer.on('project:join-request', handler)
+    return () => ipcRenderer.removeListener('project:join-request', handler)
+  },
   setWorkspaceViewBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
     ipcRenderer.invoke('workspace-view:set-bounds', bounds),
   hideWorkspaceView: () => ipcRenderer.invoke('workspace-view:hide'),

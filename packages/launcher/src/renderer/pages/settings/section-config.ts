@@ -8,6 +8,7 @@ import {
   Info,
   Languages,
   Palette,
+  Route,
   Terminal,
   type LucideIcon,
 } from "lucide-react"
@@ -17,6 +18,7 @@ export type SectionId =
   | "appearance"
   | "notifications"
   | "network"
+  | "router"
   | "data"
   | "language"
   | "updates"
@@ -57,6 +59,7 @@ export const SECTION_GROUPS: Array<{
     id: "connectivity",
     sections: [
       { id: "network", icon: Globe },
+      { id: "router", icon: Route },
       { id: "data", icon: HardDrive },
     ],
   },

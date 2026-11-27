@@ -56,8 +56,8 @@
   "themeToggle": "Theme",
   "modeLauncher": "This Computer",
   "modeLauncherShort": "Computer",
-  "modeWorkspace": "Workspace",
-  "modeSwitch": "Switch between this computer and your workspaces",
+  "modeWorkspace": "Project",
+  "modeSwitch": "Switch between this computer and the project",
   "toggleSidebar": "Toggle sidebar",
   "help": {
     "label": "Help",

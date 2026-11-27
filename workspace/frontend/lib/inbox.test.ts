@@ -100,15 +100,13 @@ describe('inboxDestination', () => {
 });
 
 describe('threadFilterFor', () => {
-  const thread = { status: 'active', starred: false, isChannel: false };
+  const thread = { status: 'active', starred: false };
   it('shows an archived thread under Archived', () => {
     expect(threadFilterFor({ ...thread, status: 'archived' }, 'all')).toBe('archived');
   });
 
   it('keeps the tab when it lists the thread, and falls back to All when not', () => {
-    expect(threadFilterFor({ ...thread, isChannel: true }, 'channels')).toBe('channels');
     expect(threadFilterFor({ ...thread, starred: true }, 'starred')).toBe('starred');
-    expect(threadFilterFor(thread, 'channels')).toBe('all');
     expect(threadFilterFor(thread, 'dms')).toBe('all');
   });
 });

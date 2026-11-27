@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   useOptimistic,
+  useRef,
   useState,
   useTransition
 } from 'react';
@@ -20,6 +21,12 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
 export type ViewMode = 'threads' | 'files' | 'knowledge' | 'browser' | 'issues' | 'workflows' | 'routines' | 'inbox' | 'connect' | 'skills' | 'agents';
+
+/** Issues, knowledge, inbox, and workflows are gone. Sessions stay on threads. */
+const RETIRED_VIEWS = new Set<ViewMode>(['issues', 'knowledge', 'inbox', 'workflows']);
+export function keptView(mode: ViewMode): ViewMode {
+  return RETIRED_VIEWS.has(mode) ? 'threads' : mode;
+}
 
 /** The Files view has two halves the folder panel switches between. */
 export type FilesSection = 'folders' | 'trash';
@@ -111,12 +118,37 @@ function writeRailPref(expanded: boolean) {
 }
 
 /**
- * The rail's two widths. Expanded is 13rem: a little narrower than shadcn's
- * default sidebar (16rem), which took close to a quarter of a 100% zoom page;
- * the Manage Agents button and the inbox envelope still fit side by side.
+ * The rail's widths. The expanded default matches the Computer sidebar, which
+ * is 16rem. Dragging stays between the minimum that still fits a project name
+ * and a cap that leaves the conversation room.
  */
 export const RAIL_WIDTH_COLLAPSED = 52;
-export const RAIL_WIDTH_EXPANDED = 208;
+export const RAIL_WIDTH_DEFAULT = 256;
+export const RAIL_WIDTH_MIN = 220;
+export const RAIL_WIDTH_MAX = 480;
+export const RAIL_WIDTH_EXPANDED = RAIL_WIDTH_DEFAULT;
+
+const RAIL_WIDTH_COOKIE = 'oa-rail-width';
+
+function readRailWidth(): number {
+  if (typeof document === 'undefined') return RAIL_WIDTH_DEFAULT;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${RAIL_WIDTH_COOKIE}=(\\d+)`));
+  const width = match ? Number(match[1]) : RAIL_WIDTH_DEFAULT;
+  if (!Number.isFinite(width)) return RAIL_WIDTH_DEFAULT;
+  return Math.max(RAIL_WIDTH_MIN, Math.min(RAIL_WIDTH_MAX, width));
+}
+
+function writeRailWidth(width: number) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${RAIL_WIDTH_COOKIE}=${width}; path=/; max-age=${LIST_PREFS_MAX_AGE}; samesite=lax`;
+}
+
+/** Where a drag from `start` by `delta` pixels leaves the rail. */
+export function nextRailDrag(start: number, delta: number): { expanded: boolean; width: number } {
+  const next = Math.round(start + delta);
+  if (next < RAIL_WIDTH_MIN) return { expanded: false, width: start >= RAIL_WIDTH_MIN ? start : RAIL_WIDTH_DEFAULT };
+  return { expanded: true, width: Math.min(RAIL_WIDTH_MAX, next) };
+}
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -174,8 +206,8 @@ interface LayoutState {
   editAgentPending: EditAgentRequest | null;
   /** The devices tab calls this once it has acted on the request. */
   consumeEditAgent: () => void;
-  threadFilter: 'all' | 'channels' | 'starred' | 'archived' | 'dms';
-  setThreadFilter: (filter: 'all' | 'channels' | 'starred' | 'archived' | 'dms') => void;
+  threadFilter: 'all' | 'starred' | 'archived' | 'dms';
+  setThreadFilter: (filter: 'all' | 'starred' | 'archived' | 'dms') => void;
   selectedAgentName: string | null;
   setSelectedAgentName: (name: string | null) => void;
   isAgentPanelOpen: boolean;
@@ -194,6 +226,15 @@ interface LayoutState {
   hasListPanel: boolean;
   /** Whether the icon rail is widened to show its labels */
   isRailExpanded: boolean;
+  /** Width of the rail while it is expanded. Collapsed stays at the icon width. */
+  railExpandedWidth: number;
+  /** Live width while a drag is in progress. Null the rest of the time. */
+  railDragWidth: number | null;
+  railResizing: boolean;
+  beginRailResize: () => void;
+  /** `width` is the rail width the pointer is asking for, in pixels. */
+  resizeRail: (width: number) => void;
+  endRailResize: () => void;
   toggleRail: () => void;
   setRailExpanded: (expanded: boolean) => void;
   /** Show an artifact side-by-side with chat */
@@ -207,10 +248,6 @@ interface LayoutState {
   setNewThreadOpen: (v: boolean) => void;
   /** Open the New Thread dialog so the user can pick agents for a new session */
   openNewThread: () => void;
-  /** Open the same dialog with "Make it a channel" already switched on */
-  openNewChannel: () => void;
-  /** Whether the open dialog started out as a new channel */
-  newThreadAsChannel: boolean;
   /**
    * Which half of the Files view the folder panel is pointing at: the folder
    * tree, or the trash. The detail pane swaps wholesale between them.
@@ -240,16 +277,16 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const setShowBrowserPreview = useCallback((open: boolean) => threadView.update({ previewOpen: open }), [threadView.update]);
   const setBrowserView = useCallback((view: BrowserView, browser?: ArtifactReference, watchOnly = false) => threadView.update({ browserView: view, browserWatchOnly: watchOnly, ...(view === 'closed' ? { selectedBrowser: null } : browser ? { selectedBrowser: browser } : {}) }), [threadView.update]);
   const setConversationWidth = useCallback((width: number) => threadView.update({ conversationWidth: width }), [threadView.update]);
-  const [threadFilter, setThreadFilter] = useState<'all' | 'channels' | 'starred' | 'archived' | 'dms'>('all');
+  const [threadFilter, setThreadFilter] = useState<'all' | 'starred' | 'archived' | 'dms'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('threads');
   useEffect(() => {
     const resource = requestedResource(window.location.href);
-    if (resource) setViewMode(resource.view);
+    if (resource) setViewMode(keptView(resource.view));
     // `?view=connect` from a settings page: open Manage Agents, then drop the
     // parameter so a reload lands on the workspace as usual.
     const view = requestedView(window.location.href);
     if (view) {
-      setViewMode(view);
+      setViewMode(keptView(view));
       window.history.replaceState(window.history.state, '', withoutRequestedView(window.location.href));
     }
   }, []);
@@ -268,23 +305,27 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const splitBrowser = true;
   const handleSetSplitBrowser = (v: boolean) => { if (!v) setShowBrowserPreview(false); };
   const [isRailExpanded, setIsRailExpanded] = useState(false);
+  const [railExpandedWidth, setRailExpandedWidth] = useState(RAIL_WIDTH_DEFAULT);
+  const [railResizing, setRailResizing] = useState(false);
+  const [railDragWidth, setRailDragWidth] = useState<number | null>(null);
+  const railExpandedRef = useRef(isRailExpanded);
+  const railWidthRef = useRef(railExpandedWidth);
+  railExpandedRef.current = isRailExpanded;
+  railWidthRef.current = railExpandedWidth;
   const openArtifact = useCallback((artifact: ArtifactReference) => {
     if (artifact.kind === 'browser') threadView.update({ selectedBrowser: artifact, browserView: 'compact', browserWatchOnly: false });
     else threadView.update({ selectedArtifact: artifact, previewOpen: true });
     setMobilePane('detail');
   }, [threadView.update]);
   const [newThreadOpen, setNewThreadOpen] = useState(false);
-  const [newThreadAsChannel, setNewThreadAsChannel] = useState(false);
-  // Separate openers rather than a flag argument: `openNewThread` is wired
-  // straight to onClick in many places, so it would receive the click event.
-  const openNewThread = () => { setNewThreadAsChannel(false); setNewThreadOpen(true); };
-  const openNewChannel = () => { setNewThreadAsChannel(true); setNewThreadOpen(true); };
+  const openNewThread = () => { setNewThreadOpen(true); };
 
   // Read on mount rather than in the initial state, so the server render and the
   // first client render agree before the stored preference is applied.
   useEffect(() => {
     setListPrefs(readListPrefs());
     setIsRailExpanded(readRailPref());
+    setRailExpandedWidth(readRailWidth());
   }, []);
 
   // Persist outside the state updater: React may run an updater more than once
@@ -296,6 +337,27 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleRail = () => setRailExpanded(!isRailExpanded);
+
+  const beginRailResize = () => setRailResizing(true);
+  const resizeRail = (width: number) => {
+    const shown = Math.max(RAIL_WIDTH_COLLAPSED, Math.min(RAIL_WIDTH_MAX, Math.round(width)));
+    setRailDragWidth(shown);
+    const result = nextRailDrag(width, 0);
+    if (!result.expanded) {
+      if (railExpandedRef.current) setRailExpanded(false);
+      return;
+    }
+    if (railWidthRef.current !== result.width) {
+      railWidthRef.current = result.width;
+      setRailExpandedWidth(result.width);
+    }
+    if (!railExpandedRef.current) setRailExpanded(true);
+  };
+  const endRailResize = () => {
+    setRailResizing(false);
+    setRailDragWidth(null);
+    writeRailWidth(railWidthRef.current);
+  };
 
   const isAgentPanelOpen = selectedAgentName !== null;
   const openMobileDetail = () => setMobilePane('detail');
@@ -329,14 +391,15 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [, startViewTransition] = useTransition();
   const [railViewMode, setRailViewMode] = useOptimistic(viewMode);
   const openView = (mode: ViewMode) => {
+    const next = keptView(mode);
     startViewTransition(() => {
-      setRailViewMode(mode);
-      setViewMode(mode);
+      setRailViewMode(next);
+      setViewMode(next);
       // Files is the exception: its list pane is a folder tree, and what you want
       // on opening it is usually the file you or an agent just added — which is
       // the detail pane's recent listing. The tree stays one tap away, and any
       // folder already selected is what the pane opens on.
-      setMobilePane(mode === 'files' ? 'detail' : 'list');
+      setMobilePane(next === 'files' ? 'detail' : 'list');
     });
   };
 
@@ -435,6 +498,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       hasListPanel,
       selectedRoutineId, setSelectedRoutineId,
       isRailExpanded,
+      railExpandedWidth,
+      railDragWidth,
+      railResizing,
+      beginRailResize,
+      resizeRail,
+      endRailResize,
       toggleRail,
       setRailExpanded,
       splitBrowser,
@@ -449,8 +518,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       newThreadOpen,
       setNewThreadOpen,
       openNewThread,
-      openNewChannel,
-      newThreadAsChannel,
     }}>
       <div data-slot="layout-wrapper" className="flex grow">
         <TooltipProvider delayDuration={0}>

@@ -153,7 +153,7 @@ class Config:
     # workspaces: never persisted per-workspace and never exposed to the frontend.
     # Yumi is only provisioned when enabled AND a key is configured, so
     # self-hosted deployments without a key simply don't get it.
-    YUMI_ENABLED: bool = os.environ.get("YUMI_ENABLED", "true").lower() in ("true", "1", "yes")
+    YUMI_ENABLED: bool = False
     YUMI_API_KEY: str = os.environ.get("YUMI_API_KEY", "")
     YUMI_BASE_URL: str = os.environ.get("YUMI_BASE_URL", "https://api-gateway.openagents.org/v1")
     # deepseek-v4.1-flash (2026-09-22): passes every manager/coordination

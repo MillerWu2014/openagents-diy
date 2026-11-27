@@ -296,7 +296,7 @@ it('shows an archived thread as active again once the server unarchives it on se
   spy.mockRestore();
 });
 
-it('keeps Yumi setup available after the welcome message and retires it once an agent is added', async () => {
+it('does not show the Yumi setup guide', async () => {
   h.ws.agents = [{ agentName: 'yumi', builtin: true, status: 'online' }];
   h.ws.sessions = [{ sessionId: 'welcome', title: 'Welcome', status: 'active', participants: ['yumi'] }];
   h.threads.welcome = [msg('welcome-greeting', 'welcome', {
@@ -306,12 +306,12 @@ it('keeps Yumi setup available after the welcome message and retires it once an 
   expect(container.querySelector('[data-yumi-guide]')).toBeNull();
 
   await act(async () => deliver('welcome', msg('setup-question', 'welcome')));
-  expect(container.querySelector('[data-yumi-guide="true"]')).not.toBeNull();
+  expect(container.querySelector('[data-yumi-guide]')).toBeNull();
 
   h.ws.agents = [
     { agentName: 'yumi', builtin: true, status: 'online' },
     { agentName: 'codex', builtin: false, status: 'offline' },
   ];
   await open('welcome');
-  expect(container.querySelector('[data-yumi-guide="false"]')).not.toBeNull();
+  expect(container.querySelector('[data-yumi-guide]')).toBeNull();
 });

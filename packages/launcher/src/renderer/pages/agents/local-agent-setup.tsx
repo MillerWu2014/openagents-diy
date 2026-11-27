@@ -18,6 +18,7 @@ import type { Agent, CatalogEntry, EnvField, HealthCheck } from "@renderer/types
 import { throwIfInstallFailed } from "@renderer/utils/installErrors"
 import { showGlobalToast } from "@renderer/hooks/useToast"
 import { createLocalSetupApi, type LocalConfiguration } from "./local-setup-api"
+import { listLocalProjects } from "./components/connect-workspace-pair"
 import { SetupAside } from "./components/setup-aside"
 import { SetupWorkdirField } from "./components/setup-workdir-field"
 import { CodexWireApiField, CredentialCheck, type CredentialTestResult } from "./components/setup-credential-check"
@@ -45,6 +46,7 @@ export function LocalAgentSetup({ agent, initialType, backLabel, onBack, onCreat
   // Bumped by the header's "Sign in" link; the configuration below answers it.
   const [signInRequest, setSignInRequest] = useState(0)
   const config = useRef<LocalConfiguration | null>(null)
+  const appliedFolder = useRef(new Set<string>())
   const locale = i18n.language.startsWith("zh") ? "zh-CN" : "en-US"
 
   const mounted = useRef(true)
@@ -52,8 +54,9 @@ export function LocalAgentSetup({ agent, initialType, backLabel, onBack, onCreat
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadVersion.current++ } }, [])
   const refresh = async (): Promise<void> => {
     const version = ++loadVersion.current
-    const [raw, supported, status, agents] = await bounded(Promise.all([
+    const [raw, supported, status, agents, projects] = await bounded(Promise.all([
       window.api.getCatalog(), window.api.getSupportedAgentTypes(), window.api.getNodeStatus(), window.api.listAgents(),
+      listLocalProjects(),
     ]))
     if (!mounted.current || version !== loadVersion.current) return
     const supportedSet = new Set(supported)
@@ -61,7 +64,14 @@ export function LocalAgentSetup({ agent, initialType, backLabel, onBack, onCreat
     setData({ raw, catalog: available.map(toCatalogEntry), node: {
       nodeId: "this-computer", name: t("agents.shared.thisComputer"), hostname: status.hostname,
       deviceType: status.deviceType, os: window.api.platform, launcherVersion: null, status: "online",
-      agents: agents.map((a) => ({ name: a.name, displayName: a.displayName ?? null, type: a.type, status: a.state, workingDir: a.path })),
+      agents: agents.map((a) => {
+        const projectFolder = projects.find((project) => project.slug === a.network)?.directory || ""
+        if (agent && a.name === agent.name && projectFolder && projectFolder !== a.path && !appliedFolder.current.has(a.name)) {
+          appliedFolder.current.add(a.name)
+          void window.api.setAgentWorkingDir(a.name, projectFolder).catch(() => { appliedFolder.current.delete(a.name) })
+        }
+        return { name: a.name, displayName: a.displayName ?? null, type: a.type, status: a.state, workingDir: projectFolder || a.path }
+      }),
       runtimes: [], lastHeartbeatAt: null, createdAt: null,
     } })
     const runtimes = await Promise.all(available.map(async (entry) => {
@@ -111,6 +121,7 @@ export function LocalAgentSetup({ agent, initialType, backLabel, onBack, onCreat
             signIn: (type) => data.raw.find((entry) => entry.name === type)?.check_ready?.login_command ? () => setSignInRequest((n) => n + 1) : undefined,
             configuration: ({ type, name, onChanged: changed, workingDirectory }) => <LocalConfigurationFields key={`${type}:${name || ""}`} type={type} name={name}
               catalog={data.raw} onChanged={changed} onBusy={setAuthBusy} signInRequest={signInRequest} workingDirectory={workingDirectory}
+              workdirHint={agent?.network ? t("agents.shared.projectFolderHint") : undefined}
               onChange={(next) => { config.current = next; setConfigReady(!!next) }} />,
           }} />
       </I18nProvider>}
@@ -122,12 +133,13 @@ export function toCatalogEntry(entry: CatalogEntry): AgentCatalogEntry {
     homepage: entry.homepage || "", tags: entry.tags || [], builtin: !!entry.builtin }
 }
 
-export function LocalConfigurationFields({ type, name, catalog, onChange, onChanged, onBusy, signInRequest = 0, workingDirectory }: {
+export function LocalConfigurationFields({ type, name, catalog, onChange, onChanged, onBusy, signInRequest = 0, workingDirectory, workdirHint }: {
   type: string; name?: string; catalog: CatalogEntry[]; onChange: (config: LocalConfiguration | null) => void; onChanged: () => void; onBusy: (busy: boolean) => void
   /** Changes when the user asks to sign in from outside this form. */
   signInRequest?: number
   /** The agent's working folder, drawn beside the model field. */
   workingDirectory?: { value: string; onChange: (value: string) => void }
+  workdirHint?: string
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [fields, setFields] = useState<EnvField[]>([])
@@ -273,7 +285,7 @@ export function LocalConfigurationFields({ type, name, catalog, onChange, onChan
       }} /></div>}
     <AgentEnvFields agentType={type} modelPath={keyForm ? "key" : "login"} modelReloadKey={String(loggedIn)}
       fields={keyForm ? fields : loginModels}
-      values={values} onChange={change} onImport={keyForm ? importValues : undefined} besideModel={workingDirectory && <SetupWorkdirField {...workingDirectory} />}
+      values={values} onChange={change} onImport={keyForm ? importValues : undefined} besideModel={workingDirectory && <SetupWorkdirField {...workingDirectory} hint={workdirHint} />}
       focusField={invalid} errors={invalid ? { [invalid.name]: t("agents.envFields.required", { name: invalid.name }) } : undefined} />
     {!keyForm && loginModels.length > 0 && <p className="m-0 text-xs text-muted-foreground">
       {t(loginModels.some((field) => field.required) ? "agents.configureDialog.modelRequiredWithLogin" : "agents.configureDialog.modelWithLogin")}

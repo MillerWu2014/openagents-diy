@@ -28,6 +28,7 @@ vi.mock('@/components/ui/tooltip', () => {
 vi.mock('next/image', () => ({ default: () => null }));
 vi.mock('./sidebar-members', () => ({ SidebarMembers: () => null }));
 vi.mock('@/components/threads/desktop-notification-prompt', () => ({ DesktopNotificationPrompt: () => null }));
+vi.mock('./project-switcher', () => ({ ProjectSwitcher: ({ name }: { name: string }) => name }));
 vi.mock('./search-menu', () => ({ SearchMenu: () => null }));
 vi.mock('./user-menu', () => ({ UserMenu: () => null }));
 vi.mock('./rail-edge', () => ({ RailEdge: () => null }));
@@ -39,7 +40,8 @@ it('shows shared agents alongside workspace navigation for a member with no owne
   const root = createRoot(host);
   try {
     await act(async () => root.render(React.createElement(NavRail)));
-    for (const label of ['views.files', 'views.knowledge', 'views.issues', 'views.inbox', 'collab.viewAgents']) expect(host.textContent).toContain(label);
+    for (const label of ['views.files', 'views.browser', 'views.routines', 'views.skills', 'collab.viewAgents']) expect(host.textContent).toContain(label);
+    for (const gone of ['views.knowledge', 'views.issues', 'views.inbox', 'views.workflows']) expect(host.textContent).not.toContain(gone);
     expect(host.textContent).toContain('shared');
     expect(host.textContent).toContain('nav.agentsWithCount');
     expect(host.textContent).not.toContain('views.tasks');
@@ -96,22 +98,18 @@ it('puts Manage Agents at the top with Inbox as the envelope beside it, as dashb
     const threads = buttons.findIndex(b => b.textContent?.startsWith('views.threads'));
     expect(manage).toBeGreaterThanOrEqual(0);
     expect(manage).toBeLessThan(threads);
-    const inbox = host.querySelectorAll('button[aria-label="views.inbox"]');
-    expect(inbox).toHaveLength(1);
-    await act(async () => (inbox[0] as HTMLButtonElement).click());
-    expect(state.openView).toHaveBeenCalledWith('inbox');
+    expect(host.querySelectorAll('button[aria-label="views.inbox"]')).toHaveLength(0);
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
-it('shows an active Welcome tab only during the introduction, then selects Connect Agent', async () => {
+it('has no Welcome tab and selects Connect Agent while onboarding owns the page', async () => {
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
   const button = (label: string) => [...host.querySelectorAll('button')].find(b => b.textContent === label);
   try {
     await act(async () => root.render(React.createElement(OnboardingSurfaceContext.Provider,
       { value: { active: true, welcome: true } }, React.createElement(NavRail))));
-    expect(button('nav.welcome')?.getAttribute('aria-current')).toBe('page');
-    expect(button('nav.manageAgents')?.getAttribute('data-active')).toBe('false');
+    expect(button('nav.welcome')).toBeUndefined();
     expect(button('views.files')).toBeDefined();
     await act(async () => root.render(React.createElement(OnboardingSurfaceContext.Provider,
       { value: { active: true, welcome: false } }, React.createElement(NavRail))));
@@ -132,22 +130,17 @@ it('hides Services by default and reflects the workspace toggle', async () => {
   } finally { state.servicesEnabled = true; await act(async () => root.unmount()); host.remove(); }
 });
 
-it('keeps Welcome accessible outside the tour until an agent is added and restores it when empty', async () => {
+it('does not put Welcome in the rail', async () => {
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
-  const openWelcome = vi.fn();
   const welcome = () => [...host.querySelectorAll('button')].find(b => b.textContent === 'nav.welcome');
   try {
     const render = (available: boolean) => root.render(React.createElement(OnboardingSurfaceContext.Provider,
-      { value: { active: false, welcome: false, welcomeAvailable: available, onOpenWelcome: openWelcome } }, React.createElement(NavRail)));
+      { value: { active: false, welcome: false, welcomeAvailable: available, onOpenWelcome: vi.fn() } }, React.createElement(NavRail)));
     await act(async () => render(true));
-    expect(welcome()?.getAttribute('data-active')).toBe('false');
-    await act(async () => welcome()!.click());
-    expect(openWelcome).toHaveBeenCalledOnce();
+    expect(welcome()).toBeUndefined();
     await act(async () => render(false));
     expect(welcome()).toBeUndefined();
-    await act(async () => render(true));
-    expect(welcome()).toBeDefined();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 

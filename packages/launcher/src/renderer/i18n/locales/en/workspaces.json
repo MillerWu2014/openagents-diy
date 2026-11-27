@@ -105,7 +105,7 @@
     "unknown": "—"
   },
   "quickConnect": {
-    "title": "Enter a pairing code to join a workspace",
+    "title": "Join a project on this computer",
     "pairLabel": "Pairing code",
     "pairPlaceholder": "XXXX-XXXX",
     "pairBtn": "Join",
@@ -123,8 +123,28 @@
     },
     "howTo": {
       "title": "How do I get a pairing code?",
-      "step1": "1. Go to <1>workspace.openagents.org</1> and sign up or sign in",
+      "step1": "1. Create a project on this computer",
       "step2": "2. Create a workspace, open it and copy its pairing code"
+    }
+  },
+  "joinRemote": {
+    "button": "Join someone's project",
+    "title": "Join someone's project",
+    "hint": "Paste the invite link, or enter the address and code. You only give your name. There is no sign-in.",
+    "link": "Invite link",
+    "host": "Their computer",
+    "port": "Port",
+    "code": "Invite code",
+    "name": "Your name",
+    "submit": "Join project",
+    "cancel": "Cancel",
+    "error": {
+      "name": "Enter your name, up to 80 characters.",
+      "missing": "That invite cannot be found.",
+      "unreachable": "That computer could not be reached. Check the address, and that both computers are on the same network.",
+      "unavailable": "This invite can no longer be used.",
+      "failed": "Could not join the project.",
+      "address": "Enter the computer's address and the invite code."
     }
   },
   "rename": {

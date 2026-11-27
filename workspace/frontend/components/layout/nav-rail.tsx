@@ -2,7 +2,6 @@
 import { useOnboardingSurface, useDismissOnboarding, useWelcomeSurface, useWelcomeNavigation, useOpenConnect } from './onboarding-surface';
 import { ConnectAgentButton } from './connect-agent-button';
 import * as React from 'react';
-import Image from 'next/image';
 import {
 BookOpen,Bot,CircleDot,CalendarClock,FileText,Globe,
 Inbox,Mail,MessageSquare,Sparkles,Waypoints
@@ -32,6 +31,7 @@ import {
 useLayout,type ViewMode
 } from './layout-context';
 import { DesktopNotificationPrompt } from '@/components/threads/desktop-notification-prompt';
+import { ProjectSwitcher } from './project-switcher';
 import { SearchMenu } from './search-menu';
 import { UserMenu } from './user-menu';
 import { SidebarMembers } from './sidebar-members';
@@ -55,7 +55,7 @@ interface RailItem {
  */
 export function NavRail() {
   const {
-    viewMode, railViewMode, openView, setSelectedAgentName, isRailExpanded, setThreadFilter, openMobileDetail,
+    viewMode, railViewMode, openView, setSelectedAgentName, isRailExpanded, railResizing, setThreadFilter, openMobileDetail,
   } = useLayout();
   const {
     workspace, agents, unreadThreadsTotal, unreadNotificationCount, pendingApprovalsByAgent,
@@ -77,26 +77,10 @@ export function NavRail() {
       icon: <MessageSquare />,
       count: unreadThreadsTotal,
     },
-    {
-      mode: 'issues',
-      label: t('views.issues'),
-      icon: <CircleDot />,
-      count: unreadIssues,
-      urgent: true,
-    },
     { mode: 'files', label: t('views.files'), icon: <FileText /> },
     { mode: 'browser', label: t('views.browser'), icon: <Globe /> },
     { mode: 'routines', label: t('views.routines'), icon: <CalendarClock /> },
-    { mode: 'knowledge', label: t('views.knowledge'), icon: <BookOpen /> },
-
-    {
-      mode: 'inbox',
-      label: t('views.inbox'),
-      icon: <Inbox />,
-      count: unreadNotificationCount,
-    },
     { mode: 'skills', label: t('views.skills'), icon: <Sparkles /> },
-    { mode: 'workflows', label: t('views.workflows'), icon: <Waypoints /> },
     // v1.1 M2: team specialists directory
     { mode: 'agents', label: t('collab.viewAgents'), icon: <Bot /> },
   ];
@@ -125,7 +109,7 @@ export function NavRail() {
       collapsible="none"
       className={cn(
         'relative w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0',
-        'transition-[width] duration-200 ease-linear',
+        !railResizing && 'transition-[width] duration-200 ease-linear',
       )}
     >
       {/* Brand, sized as shadcn dashboard-01's: a 20px mark and the name in
@@ -134,48 +118,11 @@ export function NavRail() {
       <SidebarHeader className="px-1.5 pt-3 pb-0">
         <div
           className={cn(
-            'flex h-8 items-center',
-            showLabels ? 'w-full gap-2 p-1.5' : 'justify-center',
+            'flex items-center',
+            showLabels ? 'w-full' : 'h-8 justify-center',
           )}
         >
-          <span
-            className="flex size-5 shrink-0 items-center justify-center overflow-hidden"
-            title={workspaceLabel}
-          >
-            <Image
-              src="/logo-black.png"
-              alt=""
-              width={20}
-              height={20}
-              className="size-full object-contain dark:hidden"
-            />
-            <Image
-              src="/logo-white.png"
-              alt=""
-              width={20}
-              height={20}
-              className="hidden size-full object-contain dark:block"
-            />
-          </span>
-
-          {showLabels && (
-            <span
-              className="min-w-0 flex-1 truncate text-base font-semibold"
-              aria-label={workspaceLabel}
-              onMouseEnter={(event) => {
-                const label = event.currentTarget;
-                // Keep short names quiet. The native tooltip is added only
-                // when the ellipsis is actually hiding part of the name.
-                if (label.scrollWidth > label.clientWidth) {
-                  label.title = workspaceLabel;
-                } else {
-                  label.removeAttribute('title');
-                }
-              }}
-            >
-              {workspaceLabel}
-            </span>
-          )}
+          <ProjectSwitcher name={workspaceLabel} slug={workspace?.slug} iconOnly={!showLabels} />
         </div>
       </SidebarHeader>
 
@@ -192,26 +139,6 @@ export function NavRail() {
                 showLabels={showLabels}
                 onClick={() => openConnect ? openConnect() : openView('connect')}
               />
-              {showLabels && (
-                <WithTooltip label={t('views.inbox')}><Button
-                      variant="outline"
-                      size="icon"
-                      className="relative shrink-0"
-                      aria-label={t('views.inbox')}
-                      aria-current={inboxActive ? 'page' : undefined}
-                      onClick={() => openView('inbox')}
-                    >
-                      <Mail />
-                      {unreadNotificationCount > 0 && (
-                        <UnreadBadge
-                          count={unreadNotificationCount}
-                          size="corner"
-                          className="absolute -top-1 -right-1"
-                          aria-label={t('nav.unreadCount', { count: unreadNotificationCount })}
-                        />
-                      )}
-                    </Button></WithTooltip>
-              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
@@ -223,15 +150,6 @@ export function NavRail() {
           {showLabels && <SidebarGroupLabel className="px-2">{t('nav.collaboration')}</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
-              {welcomeNavigation.available && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive={welcome} aria-current={welcome ? 'page' : undefined} aria-label={t('nav.welcome')}
-                    tooltip={{ children: t('nav.welcome'), hidden: showLabels }}
-                    className={cn(!showLabels && 'justify-center!')} onClick={() => welcomeNavigation.open ? welcomeNavigation.open() : openView('connect')}>
-                    <Sparkles />{showLabels && <span>{t('nav.welcome')}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               {navItems.filter((item) => item.mode !== 'agents' || workspace?.settings?.services_enabled === true).map((item) => (
                 <SidebarMenuItem key={item.mode} data-tour={`view-${item.mode}`}>
                   <SidebarMenuButton

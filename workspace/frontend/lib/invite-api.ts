@@ -36,6 +36,8 @@ export interface InviteAcceptResult {
   /** `"#?thread=<channel>"` | `"#?agent=<name>"` | null — appended to the
    * workspace URL after accepting so the invitee lands on the shared thing. */
   redirect?: string | null;
+  /** Set when the invite was accepted with a display name, not a sign-in. */
+  memberToken?: string | null;
 }
 
 // ── v1.1 M2 ──
@@ -66,10 +68,17 @@ export async function getInvitePeek(token: string): Promise<InvitePeek> {
   return normaliseTargetFields((await res.json()).data as InvitePeek);
 }
 
-export async function acceptInvite(token: string, idToken: string): Promise<InviteAcceptResult> {
+export async function acceptInvite(
+  token: string,
+  idToken: string | null,
+  displayName?: string,
+): Promise<InviteAcceptResult> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (idToken) headers.Authorization = `Bearer ${idToken}`;
   const res = await fetch(`${API_URL}/v1/invites/${encodeURIComponent(token)}/accept`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${idToken}` },
+    headers,
+    body: displayName ? JSON.stringify({ displayName }) : undefined,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);

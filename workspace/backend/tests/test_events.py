@@ -159,8 +159,8 @@ class TestSendEvent:
         # list (not missing field, not empty) so legacy clients skip.
         assert data["metadata"].get("target_agents") == ["__no_response__"]
 
-    def test_member_message_without_mentions_routes_to_master(self, client, workspace):
-        """Member agent messages without mentions route back to channel master."""
+    def test_member_message_without_mentions_wakes_nobody(self, client, workspace):
+        """An agent hands off only by a leading @mention or the handoff tool."""
         # Add a member agent
         client.post("/v1/join", json={
             "agent_name": "agent-beta",
@@ -179,8 +179,7 @@ class TestSendEvent:
 
         assert resp.status_code == 200
         data = resp.json()["data"]
-        # Member's response should be routed back to the master
-        assert data["metadata"]["target_agents"] == ["agent-alpha"]
+        assert data["metadata"]["target_agents"] == ["__no_response__"]
 
     def test_member_message_with_mention_routes_to_mentioned_agent(self, client, workspace):
         """Agent messages with explicit @mentions route to the mentioned agent."""

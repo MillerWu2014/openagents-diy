@@ -1,15 +1,13 @@
 'use client';
 
 import { getApiBaseUrl } from '@/lib/api-base';
+import { localProjectHref, readLocalProject } from '@/lib/local-project';
 
 import { use, Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { WorkspaceProvider, useWorkspace } from '@/lib/workspace-context';
 import { LayoutProvider } from '@/components/layout/layout-context';
 import { Wrapper } from '@/components/layout/wrapper';
-import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
-import { goToCentralLogin, redirectToLogin } from '@/lib/auth-redirects';
-import { LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { useT } from '@/lib/i18n';
@@ -188,37 +186,48 @@ function BearerWorkspace({ workspaceId, idToken }: { workspaceId: string; idToke
 
 function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   const t = useT();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-  const { user, idToken, loading: authLoading, isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
+  const urlToken = searchParams.get('token');
+  const member = searchParams.get('member');
+  const [token, setToken] = useState<string | null>(urlToken);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (token) {
-      setWorkspaceCookie(workspaceId, token);
+    if (member) return;
+    if (urlToken) {
+      setToken(urlToken);
+      setFailed(false);
+      setWorkspaceCookie(workspaceId, urlToken);
+      return;
     }
-  }, [workspaceId, token]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/v1/local/project`, { cache: 'no-store' });
+        const project = readLocalProject(res.status, await res.json().catch(() => null));
+        if (cancelled) return;
+        if (!project) throw new Error('no local project');
+        // A restored tab can name a workspace this install no longer has.
+        // Open the local project instead of spinning on the old id.
+        if (project.slug !== workspaceId) {
+          router.replace(localProjectHref(project));
+          return;
+        }
+        setWorkspaceCookie(project.slug, project.token);
+        setToken(project.token);
+        setFailed(false);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId, urlToken, member, router, attempt]);
 
-  // "Add this workspace to my account": a signed-in user who opened a shared
-  // ?token= link is persisted as a member so it shows on their Membership Home.
-  useEffect(() => {
-    if (token && idToken) {
-      import('@/lib/account-api').then(({ joinWorkspaceSelf }) =>
-        joinWorkspaceSelf(workspaceId, idToken, token),
-      );
-    }
-  }, [workspaceId, token, idToken]);
-
-  useEffect(() => {
-    if (!authLoading && isOpenAgentsDomain && (!user || !idToken)) redirectToLogin();
-  }, [authLoading, isOpenAgentsDomain, user, idToken]);
-
-  // Wait for the person's identity before ever configuring a token-only client.
-  if (authLoading || (isOpenAgentsDomain && (!user || !idToken))) return <WorkspaceLoadingSplash />;
-
-  // Has workspace token in URL — use it directly
-  if (token) {
+  if (member) {
     return (
-      <WorkspaceProvider workspaceId={workspaceId} token={token} bearerToken={idToken || undefined}>
+      <WorkspaceProvider workspaceId={workspaceId} token="" bearerToken={member}>
         <IdentityGate>
           <LayoutProvider>
             <Wrapper />
@@ -228,51 +237,32 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     );
   }
 
-  // No token — check if user is logged in via OpenAgents
-  if (isOpenAgentsDomain) {
-    if (authLoading) {
-      return <WorkspaceLoadingSplash />;
-    }
-
-    if (user && idToken) {
-      // Logged in, no ?token in the URL — resolve the workspace token from the
-      // account service using the user's identity, so the URL stays clean
-      // (/{slug}) while realtime (SSE, which needs a token) still works.
-      return <BearerWorkspace workspaceId={workspaceId} idToken={idToken} />;
-    }
-
-    // Not logged in — show login prompt
+  if (failed) {
     return (
       <Empty className="min-h-screen rounded-none bg-background">
         <EmptyHeader>
-          <EmptyTitle className="text-xl font-semibold">{t('workspaceGate.signInTitle')}</EmptyTitle>
-          <EmptyDescription>{t('workspaceGate.signInBody')}</EmptyDescription>
+          <EmptyTitle className="text-xl font-semibold">{t('workspaceGate.loadFailedTitle')}</EmptyTitle>
+          <EmptyDescription>{t('workspaceGate.loadFailedBody')}</EmptyDescription>
         </EmptyHeader>
-        {/* Redirects to the central login page (openagents.org/login), which
-            offers all supported methods — not just Google — so the label/icon
-            stay method-neutral. */}
-        <EmptyContent>
-          <Button size="lg" onClick={() => goToCentralLogin(signIn)}>
-            <LogIn data-icon="inline-start" />
-            {t('workspaceGate.logIn')}
+        <EmptyContent className="flex-row justify-center gap-2">
+          <Button variant="outline" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}>
+            {t('common.retry')}
           </Button>
         </EmptyContent>
       </Empty>
     );
   }
 
-  // Not on OpenAgents domain and no token — show token instructions
+  if (!token) return <WorkspaceLoadingSplash />;
+
   return (
-    <Empty className="min-h-screen rounded-none bg-background">
-      <EmptyHeader>
-        <EmptyTitle className="text-xl font-semibold text-destructive">{t('workspaceGate.missingToken')}</EmptyTitle>
-        <EmptyDescription>
-          {t('workspaceGate.missingTokenBefore')}{' '}
-          <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-xs text-foreground">?token=your_workspace_token</code>{' '}
-          {t('workspaceGate.missingTokenAfter')}
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <WorkspaceProvider workspaceId={workspaceId} token={token}>
+      <IdentityGate>
+        <LayoutProvider>
+          <Wrapper />
+        </LayoutProvider>
+      </IdentityGate>
+    </WorkspaceProvider>
   );
 }
 

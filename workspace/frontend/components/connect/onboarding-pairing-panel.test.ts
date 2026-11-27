@@ -40,7 +40,7 @@ function isOn(element: HTMLElement) {
 it('keeps desktop setup focused, and copies the pairing code', async () => {
   await render();
   await act(async () => button('Desktop app').click());
-  expect(container.querySelectorAll('a')).toHaveLength(3);
+  expect(container.querySelectorAll('a')).toHaveLength(0);
   expect(container.querySelector('code')).toBeNull();
   await act(async () => button('TEST-CODE').click());
   expect(copy).toHaveBeenCalledWith('TEST-CODE');
@@ -58,12 +58,12 @@ it('starts with command-line setup and switches the install command for Windows'
   expect(copy).toHaveBeenCalledWith('TEST-CODE');
   expect(container.querySelectorAll('a')).toHaveLength(0);
   expect([...container.querySelectorAll('code')].map(c => c.textContent)).toEqual([
-    'curl -fsSL https://openagents.org/install.sh | bash', 'agn device connect TEST-CODE',
+    'agn device connect TEST-CODE',
   ]);
   await act(async () => button('Windows').click());
-  expect(container.querySelector('code')?.textContent).toBe('irm https://openagents.org/install.ps1 | iex');
+  expect(container.querySelector('code')?.textContent).toBe('agn device connect TEST-CODE');
   await act(async () => button('Desktop app').click());
-  expect(container.querySelectorAll('a')).toHaveLength(3);
+  expect(container.querySelectorAll('a')).toHaveLength(0);
 });
 it('stops offering an expired pairing code on both setup paths', async () => {
   await render();
@@ -75,8 +75,8 @@ it('stops offering an expired pairing code on both setup paths', async () => {
   expect(button('TEST-CODE').disabled).toBe(true);
   await act(async () => fallback().click());
   const copies = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Copy command"]');
-  expect(copies[0].disabled).toBe(false);
-  expect(copies[1].disabled).toBe(true);
+  expect(copies).toHaveLength(1);
+  expect(copies[0].disabled).toBe(true);
 });
 
 
@@ -98,8 +98,9 @@ it.each(['Command line', 'Desktop app'])('renews an expired code without resetti
   expect(isOn(button(method))).toBe(true);
   if (method === 'Command line') {
     expect(isOn(button('Windows'))).toBe(true);
-    expect(container.querySelector('code')?.textContent).toContain('install.ps1');
-  } else expect(container.querySelectorAll('a')).toHaveLength(3);
+    await act(async () => fallback().click());
+    expect(container.querySelector('code')?.textContent).toBe('agn device connect NEWX-CODE');
+  } else expect(container.querySelectorAll('a')).toHaveLength(0);
   expect(button('NEWX-CODE').disabled).toBe(false);
   await act(async () => button('NEWX-CODE').click());
   expect(copy).toHaveBeenCalledWith('NEWX-CODE');
@@ -110,7 +111,7 @@ it('honors an explicit location choice while allowing manual changes until anoth
   const computer = { method: 'desktop' as const };
   await render(pairing, { methodRequest: computer });
   expect(isOn(button('Desktop app'))).toBe(true);
-  expect(container.querySelectorAll('a')).toHaveLength(3);
+  expect(container.querySelectorAll('a')).toHaveLength(0);
   await act(async () => button('Command line').click());
   await render(pairing, { methodRequest: computer });
   expect(isOn(button('Command line'))).toBe(true);
@@ -136,7 +137,7 @@ it('gives instructions to paste into Claude Code or Codex, with the code in the 
   await act(async () => button('From your agent').click());
   expect(isOn(button('From your agent'))).toBe(true);
   const text = container.querySelector('pre')?.textContent || '';
-  expect(text).toContain('Connect yourself to my OpenAgents workspace.');
+  expect(text).toContain('Connect yourself to my OpenAgents project.');
   expect(text).toContain('npx -y @openagents-org/agent-launcher@latest join TEST-CODE');
   await act(async () => button('Copy instructions').click());
   expect(copy).toHaveBeenCalledWith(text);

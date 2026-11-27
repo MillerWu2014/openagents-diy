@@ -17,7 +17,6 @@ import {
 } from "@renderer/components/ui/sidebar"
 import { useSidebarStore } from "@renderer/store/sidebar"
 import { useUiStore } from "@renderer/store/ui"
-import { docsUrl } from "@renderer/lib/docs-links"
 import { RAIL_BUTTON, RailLabel } from "./rail-label"
 
 /**
@@ -29,10 +28,9 @@ import { RAIL_BUTTON, RailLabel } from "./rail-label"
  * icon widens the sidebar first.
  */
 export function NavHelp(): React.JSX.Element {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { state, isMobile } = useSidebar()
   const [open, setOpen] = React.useState(false)
-  const language = i18n.resolvedLanguage ?? i18n.language
   const label = t("nav.help.label")
 
   const onToggle = (next: boolean): void => {
@@ -57,14 +55,6 @@ export function NavHelp(): React.JSX.Element {
               <SidebarMenuSubButton asChild>
                 <button type="button" data-testid="nav-help-tour" onClick={() => useUiStore.getState().startTour()}>
                   <span>{t("nav.help.replayTour")}</span>
-                </button>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-            <SidebarMenuSubItem>
-              <SidebarMenuSubButton asChild>
-                {/* The guide opens in the browser, not in the app. */}
-                <button type="button" data-testid="nav-help-docs" onClick={() => window.api.openExternal(docsUrl(language))}>
-                  <span>{t("nav.help.docs")}</span>
                 </button>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>

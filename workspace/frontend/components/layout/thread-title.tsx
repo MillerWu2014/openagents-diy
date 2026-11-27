@@ -86,7 +86,6 @@ export function ThreadTitle() {
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      {session?.isChannel && <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("threads.channel")} />}
       <h3 className="flex min-w-0">
         <WithTooltip label={t("header.clickToRename")}>
           <Button variant="ghost" size="sm" onClick={startEditing} className="-mx-1 min-w-0 shrink px-1 text-base font-medium">

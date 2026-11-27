@@ -45,6 +45,9 @@ export function PendingInvites({ invites, onChanged }: { invites: TeamInvite[]; 
                 <span className="truncate">{inv.email ?? t('admin.openInviteLink')}</span>
                 <Badge variant="outline">{roleLabel(t, inv.role)}</Badge>
               </ItemTitle>
+              {inv.code && (
+                <ItemDescription className="line-clamp-1 text-xs">{t('admin.inviteCode', { code: inv.code })}</ItemDescription>
+              )}
               {inv.expiresAt && (
                 <ItemDescription className="text-xs">
                   {t('admin.inviteExpires', { time: new Date(inv.expiresAt).toLocaleDateString() })}

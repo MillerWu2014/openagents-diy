@@ -23,9 +23,9 @@ describe('shareOrigin', () => {
     expect(shareOrigin()).toBe('https://ws.example.com');
   });
 
-  it('falls back to the hosted app on localhost', () => {
+  it('falls back to this computer on localhost', () => {
     openAt('http://localhost:3000/abc123');
-    expect(shareOrigin()).toBe('https://workspace.openagents.org');
+    expect(shareOrigin()).toBe('http://127.0.0.1:18765');
   });
 
   it('uses the web origin the launcher hands to its bundled build', () => {
@@ -35,10 +35,10 @@ describe('shareOrigin', () => {
 
   it('never returns the bundle scheme, even without a handed-over origin', () => {
     openAt('openagents://workspace/index.html');
-    expect(shareOrigin()).toBe('https://workspace.openagents.org');
+    expect(shareOrigin()).toBe('http://127.0.0.1:18765');
   });
 
-  it('falls back to the hosted app while rendering on the server', () => {
-    expect(shareOrigin()).toBe('https://workspace.openagents.org');
+  it('falls back to this computer while rendering on the server', () => {
+    expect(shareOrigin()).toBe('http://127.0.0.1:18765');
   });
 });

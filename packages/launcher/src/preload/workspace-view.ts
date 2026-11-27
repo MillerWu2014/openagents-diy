@@ -150,6 +150,10 @@ contextBridge.exposeInMainWorld("__oaHost__", {
   /** Switch to the newer bundle. The launcher reloads every page onto it. */
   applyBundleUpdate: () => ipcRenderer.send("workspace-view:bundle-apply"),
   openComputer: () => ipcRenderer.send("workspace-view:open-computer"),
+  listLocalAgents: () => ipcRenderer.invoke("agents:list"),
+  pickDirectory: () => ipcRenderer.invoke("dialog:select-directory"),
+  createLocalProject: (input: { name: string; directory: string; agents: string[] }) =>
+    ipcRenderer.invoke("agents:create-local-project", input),
   signIn: () => ipcRenderer.send("workspace-view:sign-in"),
   signOut: () => ipcRenderer.send("workspace-view:sign-out"),
   connectComputer: (workspaceId: string) => ipcRenderer.invoke("workspace-view:connect-computer", workspaceId),
@@ -179,6 +183,8 @@ contextBridge.exposeInMainWorld("__oaHost__", {
    * call the tab until its page names it, when the page knows. */
   openRoute: (route: string, title?: string) => ipcRenderer.send("workspace-view:open-route", route, title),
   /** Name this tab, and let it answer to both the workspace's slug and its id. */
+  /** Move this computer's agents onto a project before the page opens it. */
+  focusProject: (slug: string) => ipcRenderer.send("workspace-view:focus-project", slug),
   reportWorkspace: (info: { id: string; slug: string; name: string }) => {
     if (config?.scope?.kind !== "workspace") return
     if (info?.id) aliases.add(info.id)

@@ -2,11 +2,11 @@
 
 import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogIn, Mail, UserPlus } from 'lucide-react';
+import { Mail, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/reui/button';
 import { getInvitePeek, acceptInvite, inviteLandingPath, type InvitePeek } from '@/lib/invite-api';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
-import { goToCentralLogin, goToCentralLogout } from '@/lib/auth-redirects';
+import { goToCentralLogout } from '@/lib/auth-redirects';
 import { useT } from '@/lib/i18n';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -26,6 +26,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   const [peekError, setPeekError] = useState(false);
   const [joining, setJoining] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [name, setName] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -36,11 +37,15 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   }, [token]);
 
   const join = useCallback(async () => {
-    if (!idToken) return;
+    if (!idToken && !name.trim()) return;
     setJoining(true);
     setAcceptError(null);
     try {
-      const result = await acceptInvite(token, idToken);
+      const result = await acceptInvite(token, idToken || null, name.trim() || undefined);
+      if (result.memberToken) {
+        router.replace(`/${result.slug}?member=${encodeURIComponent(result.memberToken)}`);
+        return;
+      }
       // Member now — land in the workspace via bearer access (clean URL, no
       // credentials in the address bar). v1.1 M2: a targeted invite carries a
       // `#?thread=` / `#?agent=` hash so they land on the shared thing.
@@ -49,7 +54,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
       setAcceptError(e instanceof Error ? e.message : t('invitePage.acceptFailed'));
       setJoining(false);
     }
-  }, [idToken, token, router, t]);
+  }, [idToken, name, token, router, t]);
 
   const autoJoinAttempted = useRef(false);
   useEffect(() => {
@@ -153,15 +158,19 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
         </div>
       ) : (
         <div className="space-y-3">
-          {/* goToCentralLogin round-trips back to this invite URL. */}
-          <Button className="w-full" onClick={() => {
-            try { sessionStorage.setItem('oa-accept-invite', token); } catch { /* Join button remains available after login. */ }
-            goToCentralLogin(undefined, { forceCentral: true });
-          }}>
-            <LogIn className="size-4" />
-            {t('invitePage.signInToAccept')}
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('invitePage.nameLabel')}
+            aria-label={t('invitePage.nameLabel')}
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+          />
+          <Button className="w-full" onClick={join} disabled={joining || !name.trim()}>
+            {joining ? <Spinner aria-hidden="true" className="size-4" /> : <UserPlus className="size-4" />}
+            {t('invitePage.join', { workspace: peek.workspaceName })}
           </Button>
           <p className="text-xs text-muted-foreground">{t('invitePage.signInHint')}</p>
+          {acceptError && <p className="text-xs text-destructive">{acceptError}</p>}
         </div>
       )}
     </>,

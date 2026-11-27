@@ -86,21 +86,8 @@ export interface UpdaterState {
   autoDownload: boolean
 }
 
-// Where the download-page fallback points, per OS/arch. Linux has no dedicated
-// endpoint yet, so it keeps the GitHub Releases page.
-const GITHUB_RELEASES_URL =
-  "https://github.com/openagents-org/openagents/releases"
-
 function resolveDownloadUrl(): string {
-  if (process.platform === "win32") {
-    return "https://openagents.org/api/download/launcher/windows"
-  }
-  if (process.platform === "darwin") {
-    return process.arch === "arm64"
-      ? "https://openagents.org/api/download/launcher/mac"
-      : "https://openagents.org/api/download/launcher/mac-intel"
-  }
-  return GITHUB_RELEASES_URL
+  return ""
 }
 
 let _state: UpdaterState = {
@@ -524,27 +511,9 @@ export function setupAutoUpdater(opts: {
   _state.currentVersion = app.getVersion()
   _state.autoDownload = _isAutoUpdateEnabled()
 
-  // Unpackaged builds get the SAME update flow as a release: electron-updater
-  // reads dev-app-update.yml (repo root) once forceDevUpdateConfig is set, so
-  // `npm run dev` checks the real release feed. This used to bail out with a
-  // `supported: false` state and its own UI variant — which meant the update
-  // banner, notifications and wording could not be exercised without cutting an
-  // installer, so the one branch nobody could test was the one users saw.
-  //
-  // Only check + download are meaningful here; quitAndInstall can't replace a
-  // dev tree, which is fine — everything up to "ready to install" is what needs
-  // verifying.
-  if (!app.isPackaged) {
-    autoUpdater.forceDevUpdateConfig = true
-    _log("[updater] dev build: checking the real release feed via dev-app-update.yml")
-  }
-
-  // electron-updater's Linux installer replaces an AppImage. A packaged deb
-  // has no APPIMAGE path to replace, so expose the manual download fallback
-  // instead of offering a restart that cannot install anything.
-  emit({
-    supported: !(process.platform === "linux" && app.isPackaged && !process.env.APPIMAGE),
-  })
+  // This fork is installed by hand. Do not read a release feed or offer a
+  // download from anywhere else.
+  emit({ supported: false })
 
   // Move the staging cache off a non-ASCII path BEFORE any check runs —
   // AppUpdater memoizes the resolved cache dir on first use. On a Chinese

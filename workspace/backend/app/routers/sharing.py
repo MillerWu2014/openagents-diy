@@ -383,7 +383,10 @@ def list_participants(
             "visibility": legacy_agent_visibility(usable.get(name, {})),
             "usable_by": usable.get(name),
             "owner_display_name": owner_names.get(_norm(m.owner_email)) if m else None,
-            "request_access": request_access(db, ctx.wid, ch, m, ctx.viewer.email),
+            # A token-only caller has no email, and request_access treats that as
+            # "no". This app opens a project that way, so the machine credential
+            # — already fully trusted here — can mention every agent on the thread.
+            "request_access": "yes" if ctx.viewer.machine and m is not None and m.status != "removed" else request_access(db, ctx.wid, ch, m, ctx.viewer.email),
             "can_request_sharing": bool(m and m.status != "removed" and ctx.viewer.kind == "human"
                 and ctx.viewer.email in people and _norm(m.owner_email) in people
                 and _norm(m.owner_email) != ctx.viewer.email and not ch.service_id),

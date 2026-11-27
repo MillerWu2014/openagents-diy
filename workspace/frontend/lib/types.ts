@@ -34,6 +34,8 @@ export interface TeamInvite {
   email: string | null;
   role: WorkspaceRole;
   url: string;
+  /** The invite code inside `url`. Present for a local project invite. */
+  code?: string;
   status: 'pending' | 'accepted' | 'expired' | 'revoked';
   createdBy: string | null;
   createdAt: string | null;
@@ -334,7 +336,6 @@ export interface WorkspaceSession {
   status: string;
   starred: boolean;
   pinned?: boolean;
-  isChannel?: boolean;
   participants: string[];
   master: string | null;
   // Multi-agent collaboration mode: 'dynamic' | 'master' | 'workflow'
@@ -912,94 +913,6 @@ export interface CloudAgentModel {
   supportedProtocols?: string[];
 }
 
-/** A provider that hosts agent runtimes for the workspace (Acenta). */
-export interface HostedAgentProvider {
-  name: string;
-  label: string;
-  /** False until the server is configured to reach the provider. */
-  available: boolean;
-  harness: string;
-  url: string;
-}
-
-/** One of the signed-in user's Acenta agents, as seen from this workspace. */
-export interface AcentaAgent {
-  id: string;
-  name: string;
-  agentName: string;
-  state: string;
-  tier: string | null;
-  url: string;
-  /** Acenta's launch page while the agent waits for sign-in or payment. */
-  launchUrl: string | null;
-  inThisWorkspace: boolean;
-  workspaces: number;
-  workspaceLimit: number;
-}
-
-export interface AcentaAccount {
-  /** False until the user has an Acenta account (same OpenAgents sign-in or email). */
-  hasAccount: boolean;
-  agents: AcentaAgent[];
-  agentLimit: number;
-}
-
-/** How one Acenta agent is paid for. */
-export interface AcentaAgentUsage {
-  id: string;
-  /** included: no charge for this account; usage: from the balance; pass: monthly pass; subscription: monthly card plan. */
-  mode: 'included' | 'usage' | 'pass' | 'subscription';
-  tier: string | null;
-  status: string | null;
-  spentThisMonthCents: number;
-  /** When a monthly pass ends. */
-  renewalAt: string | null;
-}
-
-/** The signed-in user's Acenta balance and this month's spend. */
-export interface AcentaUsage {
-  hasAccount: boolean;
-  billingEnabled: boolean;
-  balanceEnabled: boolean;
-  balanceCents: number;
-  spentThisMonthCents: number;
-  autoTopup: boolean;
-  agents: AcentaAgentUsage[];
-  /** Acenta's dashboard, where the balance is topped up and plans are changed. */
-  manageUrl: string | null;
-  /** A time-limited Acenta offer (e.g. Black Friday) while it runs. */
-  offer?: AcentaOffer | null;
-}
-
-/** A time-limited Acenta offer for new customers' first monthly agent. */
-export interface AcentaOffer {
-  name: string;
-  percentOff: number;
-  months: number;
-  tiers: string[] | null;
-  endsAt: string;
-  /** False once this user has had a monthly agent (the offer is for new customers). */
-  eligible: boolean;
-  url: string | null;
-}
-
-/** An agent whose runtime a provider hosts; it joins like any other agent. */
-export interface HostedAgent {
-  agentName: string;
-  displayName: string;
-  provider: string;
-  status: 'launching' | 'setup' | 'active' | 'terminating' | 'linked';
-  /** Added here from the owner's Acenta account; removing only disconnects it. */
-  linked?: boolean;
-  externalId?: string | null;
-  /** Acenta launch page (sign-in and payment) while status is "setup". */
-  setupUrl: string | null;
-  /** From the agent's own heartbeats. */
-  presence: 'online' | 'offline';
-  ownerEmail: string;
-  createdAt: string | null;
-}
-
 export interface CloudAgentConfig {
   agentName: string;
   provider: string;
@@ -1076,7 +989,6 @@ export interface NetworkChannel {
   status: string;
   starred: boolean;
   pinned?: boolean;
-  is_channel?: boolean;
 }
 
 export interface NetworkDiscovery {
@@ -1215,7 +1127,6 @@ export function networkChannelToSession(ch: NetworkChannel, workspaceId: string)
     pinned: ch.pinned || false,
     icon: ch.icon,
     humanCount: ch.human_count,
-    isChannel: ch.is_channel || false,
     participants: ch.participants,
     master: ch.master,
     orchestrationMode: ch.orchestration_mode || 'dynamic',
