@@ -63,9 +63,13 @@ def _format(hosted: HostedAgent, member: Optional[WorkspaceMember]) -> dict:
     }
 
 
+def _removed():
+    return json_response(ResponseCode.BAD_REQUEST, "Acenta cloud agents have been removed.", status_code=410)
+
+
 @router.get("/hosted-agents/providers")
 def list_hosted_providers():
-    return success_response({"providers": [hosting.provider_info()]})
+    return success_response({"providers": []})
 
 
 @router.get("/hosted-agents")
@@ -75,6 +79,7 @@ def list_hosted_agents(
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
 ):
+    return _removed()
     workspace = _resolve_workspace(db, network)
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "Network not found")
@@ -185,7 +190,7 @@ def list_my_acenta_agents(
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
 ):
-    """The signed-in user's Acenta agents and whether each is already here."""
+    return _removed()
     workspace = _resolve_workspace(db, network)
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "Network not found")
@@ -218,7 +223,7 @@ def my_acenta_usage(
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
 ):
-    """The signed-in user's Acenta balance, this month's spend and each agent's plan."""
+    return _removed()
     workspace = _resolve_workspace(db, network)
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "Network not found")
@@ -275,7 +280,7 @@ def connect_acenta_agent(
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
 ):
-    """Add one of the user's existing Acenta agents to this workspace."""
+    return _removed()
     workspace = _resolve_workspace(db, body.network)
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "Network not found")
@@ -342,6 +347,7 @@ def launch_hosted_agent(
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
 ):
+    return _removed()
     workspace = _resolve_workspace(db, body.network)
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "Network not found")
@@ -410,6 +416,7 @@ def remove_hosted_agent(
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
 ):
+    return _removed()
     workspace = _resolve_workspace(db, network)
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "Network not found")

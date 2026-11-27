@@ -471,7 +471,6 @@ export function ConnectAgentView({
             saving={saving}
             onAdd={handleAddCloudAgent}
             onRemove={handleRemoveCloudAgent}
-            onHostedChanged={refreshWorkspace}
           />
         )}
       </div>

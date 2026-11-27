@@ -5,7 +5,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { useTokenPayModels } from '@/hooks/use-tokenpay-models';
 import { useT } from '@/lib/i18n';
 import { workspaceApi } from '@/lib/api';
-import { HostedAgentsSection } from './hosted-agents-section';
 import { CategoryIcon, ConnectedCloudAgents } from './cloud-connected-agents';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +52,6 @@ export function CloudAgentsTab({
   saving,
   onAdd,
   onRemove,
-  onHostedChanged,
 }: {
   providers: CloudAgentProvider[];
   cloudAgents: CloudAgentConfig[];
@@ -77,7 +75,6 @@ export function CloudAgentsTab({
   saving: boolean;
   onAdd: () => void;
   onRemove: (name: string) => void;
-  onHostedChanged: () => void;
 }) {
   const t = useT();
   const isTokenPay = selectedProvider === 'tokenpay';
@@ -289,7 +286,6 @@ export function CloudAgentsTab({
         <h2 className="text-lg font-semibold">{t('connect.cloudMarketplaceTitle')}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t('connect.cloudMarketplaceHint')}</p>
       </div>
-      <HostedAgentsSection onChanged={onHostedChanged} />
 
       <ConnectedCloudAgents agents={connectedAgents} onRemove={onRemove} />
     </div>
