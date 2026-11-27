@@ -136,6 +136,8 @@ export async function ensureLocalWorkspace(): Promise<boolean> {
         // on this computer. See app/lan_guard.py.
         LOCAL_LAN_GUARD: "1",
         LOCAL_WORKSPACE_PORT: String(LOCAL_WORKSPACE_PORT),
+        FRONTEND_BASE_URL: url,
+        PUBLIC_API_BASE: url,
       },
       stdio: ["ignore", "ignore", "pipe"],
     },

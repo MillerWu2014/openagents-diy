@@ -110,7 +110,7 @@ def _shell(title: str, header: str, body: str, lang: str, banner: str = "", prev
             "<meta name=\"referrer\" content=\"no-referrer\"><meta name=\"robots\" content=\"noindex,nofollow\">"
             f"<title>{html.escape(title)}</title>{preview}<style>{_CSS}</style></head><body>"
             f"{header}{banner}<main>{body}</main>"
-            f"<footer>{html.escape(s['footer'])} · <a href=\"https://openagents.org\" rel=\"noopener noreferrer\">openagents.org</a></footer>"
+            f"<footer>{html.escape(s['footer'])}</footer>"
             "</body></html>")
 
 

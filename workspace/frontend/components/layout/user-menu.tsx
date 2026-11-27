@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import {
-  BookOpen, Check, Compass, EllipsisVertical, KeyRound, LayoutGrid, LayoutList, LogIn, LogOut, Monitor, Moon, Settings, Shield, Sun, User, UserPlus, MessageSquarePlus } from 'lucide-react';
+  Check, Compass, EllipsisVertical, KeyRound, LayoutGrid, LayoutList, LogIn, LogOut, Monitor, Moon, Settings, Shield, Sun, User, UserPlus, MessageSquarePlus } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import {
@@ -28,8 +28,7 @@ import { canAdminister } from '@/components/settings/admin-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { goToCentralLogin, goToCentralLogout } from '@/lib/auth-redirects';
-import { useI18n, useT } from '@/lib/i18n';
-import { docsUrl } from '@/lib/docs-links';
+import { useT } from '@/lib/i18n';
 import { startWorkspaceTour } from '@/lib/workspace-tour';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { currentRouteSearch } from '@/lib/route-search';
@@ -55,7 +54,6 @@ const THEME_OPTIONS = [
 ] as const;
 
 export function UserMenu({ side, align = 'end', variant = 'icon' }: UserMenuProps = {}) {
-  const { locale } = useI18n();
   const isMobile = useIsMobile();
   const { workspace, token, currentUser } = useWorkspace();
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
@@ -257,14 +255,6 @@ export function UserMenu({ side, align = 'end', variant = 'icon' }: UserMenuProp
             {t('userMenu.sendFeedback')}
           </DropdownMenuItem>
 
-          {/* The user guide, opened outside the app (the desktop app hands
-              new windows to the system browser), and the guided tour again. */}
-          <DropdownMenuItem asChild>
-            <a href={docsUrl(locale)} target="_blank" rel="noopener noreferrer">
-              <BookOpen />
-              {t('userMenu.docs')}
-            </a>
-          </DropdownMenuItem>
           {/* The tour points at the desktop layout's rail; phones have none. */}
           {!isMobile && (
             <DropdownMenuItem onClick={startWorkspaceTour}>

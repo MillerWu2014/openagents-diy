@@ -147,7 +147,6 @@ export default function SharedArtifactPage({ params }: { params: Promise<{ token
       <Shell>
         <h1 className="text-xl font-semibold">{t('sharedFile.title')}</h1>
         <p className="max-w-md text-sm text-muted-foreground">{error}</p>
-        <a href="https://openagents.org" className="text-sm text-primary hover:underline">{t('shared.goToOpenAgents')}</a>
       </Shell>
     );
   }

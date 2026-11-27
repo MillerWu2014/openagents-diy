@@ -1,26 +1,13 @@
 import React from "react"
 import { useTranslation } from "react-i18next"
-import { ExternalLink } from "lucide-react"
-
 import { Badge } from "@renderer/components/ui/badge"
-import { Button } from "@renderer/components/ui/button"
 import { Card } from "@renderer/components/ui/card"
 import { BrandMark } from "@renderer/components/ui-kit"
 import { useThemeStore } from "@renderer/store/theme"
 import { SettingsCard,
-  Row,
   InfoRow,
 } from "../components/settings-card"
 import type { RuntimeInfo, SystemInfo } from "@renderer/types"
-
-const REPO = "https://github.com/openagents-org/openagents"
-
-const LINKS = [
-  { id: "docs", url: "https://openagents.org/docs" },
-  { id: "repo", url: REPO },
-  { id: "issues", url: `${REPO}/issues` },
-  { id: "releases", url: `${REPO}/releases` },
-] as const
 
 interface Props {
   launcherVersion: string
@@ -93,44 +80,6 @@ export function AboutSection({
           }
           mono
         />
-      </SettingsCard>
-
-      <SettingsCard title={t("settings.about.resourcesGroup")}>
-        {LINKS.map((link) => (
-          <Row
-            key={link.id}
-            label={t(`settings.about.links.${link.id}`)}
-            // The URL reads as the link it is; the button next to it is what
-            // actually opens the browser.
-            desc={<span className="text-primary">{link.url}</span>}
-          >
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => window.api.openExternal(link.url)}
-            >
-              {t("settings.about.open")}
-              <ExternalLink />
-            </Button>
-          </Row>
-        ))}
-        {/* The licence is stated here, next to the way to read it, instead of
-            as a bare "MIT" row in the version card. */}
-        <Row
-          label={t("settings.about.licenseFile")}
-          desc={t("settings.about.licenseFileDesc")}
-        >
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              window.api.openExternal(`${REPO}/blob/develop/LICENSE`)
-            }
-          >
-            {t("settings.about.view")}
-            <ExternalLink />
-          </Button>
-        </Row>
       </SettingsCard>
     </>
   )

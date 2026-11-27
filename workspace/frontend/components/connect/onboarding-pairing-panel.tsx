@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { useIsMobileDevice } from '@/hooks/use-mobile-device';
-import { desktopDownloads } from '@/lib/desktop-downloads';
 import { useT } from '@/lib/i18n';
 import type { PairingCode } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -66,10 +65,6 @@ export function OnboardingPairingPanel({ pairing, onDismiss, onRegenerate, regen
       {expired ? t('connect.nodePairingExpired') : t('connect.nodePairingExpires', { minutes: Math.max(1, Math.ceil(remaining / 60000)) })}
     </Badge>
   );
-  const install = os === 'windows'
-    ? 'irm https://openagents.org/install.ps1 | iex'
-    : 'curl -fsSL https://openagents.org/install.sh | bash';
-
   return (
     <section className="overflow-hidden rounded-2xl border border-border/80 bg-background shadow-sm" aria-label={t('onboarding.setupComputer')}>
       <div className="border-b border-border/70 px-5 py-5 sm:px-6">
@@ -97,32 +92,18 @@ export function OnboardingPairingPanel({ pairing, onDismiss, onRegenerate, regen
           <div className="min-w-0 flex-1 space-y-2.5">
             <h3 className="text-sm font-semibold leading-7">{t(terminal ? 'onboarding.installCliTitle' : 'onboarding.installAppTitle')}</h3>
             {terminal ? (
-              <>
-                <ToggleGroup type="single" variant="outline" size="sm" value={os} aria-label={t('onboarding.setupOs')}
-                  // Pressing the picked system again would clear it; one is always picked.
-                  onValueChange={(next) => { if (next) setOs(next as typeof os); }}>
-                  {(['unix', 'windows'] as const).map((value) => (
-                    <ToggleGroupItem key={value} value={value} className="text-xs">
-                      {t(value === 'unix' ? 'connect.nodeOsUnix' : 'connect.nodeOsWindows')}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-                <SetupCommand command={install} />
-              </>
+              <ToggleGroup type="single" variant="outline" size="sm" value={os} aria-label={t('onboarding.setupOs')}
+                // Pressing the picked system again would clear it; one is always picked.
+                onValueChange={(next) => { if (next) setOs(next as typeof os); }}>
+                {(['unix', 'windows'] as const).map((value) => (
+                  <ToggleGroupItem key={value} value={value} className="text-xs">
+                    {t(value === 'unix' ? 'connect.nodeOsUnix' : 'connect.nodeOsWindows')}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             ) : isMobile ? (
               <p className="rounded-xl bg-muted/50 p-3 text-sm leading-6 text-muted-foreground">{t('onboarding.useComputerHint')}</p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-3">
-                {desktopDownloads(t).map((d) => (
-                  <a key={d.os} href={d.href} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-lg border px-3 py-3 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5">
-                    <img src={`/icons/platforms/${d.platform === 'macos' ? 'apple' : 'windows'}.svg`}
-                      alt="" aria-hidden="true" width={14} height={14}
-                      className="size-3.5 shrink-0 object-contain opacity-70 dark:invert" />{d.os}
-                  </a>
-                ))}
-              </div>
-            )}
+            ) : null}
             <p className="text-sm leading-6 text-muted-foreground">{t(terminal ? 'onboarding.installCliHint' : 'onboarding.installAppHint')}</p>
           </div>
         </div>

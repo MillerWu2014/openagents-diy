@@ -97,12 +97,6 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
         <Image src="/logo-icon.png" alt="OpenAgents" width={40} height={40} />
         <h1 className="text-xl font-semibold">{t('shared.title')}</h1>
         <p className="text-muted-foreground text-sm max-w-md text-center">{error}</p>
-        <a
-          href="https://openagents.org"
-          className="text-sm text-primary hover:underline"
-        >
-          {t('shared.goToOpenAgents')}
-        </a>
       </div>
     );
   }
@@ -116,12 +110,6 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
             <Image src="/logo-icon.png" alt="OpenAgents" width={24} height={24} />
             <span className="text-sm font-medium text-muted-foreground">{t('shared.title')}</span>
           </div>
-          <a
-            href="https://openagents.org"
-            className="text-sm text-primary hover:underline"
-          >
-            OpenAgents
-          </a>
         </div>
       </header>
 
@@ -143,16 +131,9 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
 
       {/* Footer */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 text-center border-t mt-8">
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="text-sm text-muted-foreground">
           {t('shared.footerNote')}
         </p>
-        <a
-          href="https://openagents.org"
-          className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-        >
-          <Image src="/logo-icon.png" alt="" width={16} height={16} />
-          {t('shared.tryOpenAgents')}
-        </a>
       </div>
     </div>
   );
