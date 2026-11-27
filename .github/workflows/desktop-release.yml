@@ -1,0 +1,39 @@
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm --prefix ../../workspace/frontend install --no-audit --no-fund
+        working-directory: packages/launcher
+
+      - name: Build unsigned Apple Silicon installer
+        working-directory: packages/launcher
+        run: |
+          npm run build
+          CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --arm64 --publish never \
+            --config.mac.identity=null --config.mac.notarize=false
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/launcher/dist/*.dmg
+          generate_release_notes: true
