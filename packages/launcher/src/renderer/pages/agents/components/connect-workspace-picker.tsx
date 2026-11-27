@@ -1,34 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronDown } from "lucide-react"
-
 import { DialogBody, DialogFooter } from "@renderer/components/ui/dialog"
 import { Button } from "@renderer/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@renderer/components/ui/collapsible"
 import { Separator } from "@renderer/components/ui/separator"
 import { SearchInput } from "@renderer/components/ui-kit"
 import { useAgentsStore } from "@renderer/store/agents"
-import { cn } from "@renderer/lib/utils"
-import type { PairedWorkspace } from "@renderer/components/workspaces/use-pair-device"
 import type { ToastType } from "@renderer/hooks/useToast"
-import { PairCodeForm } from "./connect-workspace-pair"
+import { LocalProjectCreate } from "./connect-workspace-pair"
 import { WorkspaceOptionRow, type WorkspaceOption } from "./workspace-option-row"
 
 /**
  * The add-to-workspace dialog when this device is in at least one workspace:
- * pick one and connect. Joining another one is secondary: a pairing code can
- * be entered right here, folded away until asked for.
+ * pick one and connect. A new project is created on this computer.
  */
 export function ConnectWorkspacePicker({
   options,
+  agentName,
   onConnect,
-  onPaired,
+  onCreated,
   onCancel,
   showToast,
 }: {
   options: WorkspaceOption[]
+  agentName?: string
   onConnect: (slug: string) => void
-  onPaired: (workspace: PairedWorkspace) => void
+  onCreated: () => void
   onCancel: () => void
   showToast: (msg: string, type?: ToastType) => void
 }): React.JSX.Element {
@@ -36,7 +32,6 @@ export function ConnectWorkspacePicker({
   const agents = useAgentsStore((s) => s.agents)
   const [query, setQuery] = useState("")
   const [cursor, setCursor] = useState(0)
-  const [pairOpen, setPairOpen] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   const filtered = useMemo(() => {
@@ -110,18 +105,7 @@ export function ConnectWorkspacePicker({
         </div>
 
         <Separator />
-        <Collapsible open={pairOpen} onOpenChange={setPairOpen}>
-          <CollapsibleTrigger className="flex w-full items-start gap-2 text-left">
-            <ChevronDown className={cn("mt-0.5 size-4 shrink-0 transition-transform", !pairOpen && "-rotate-90")} />
-            <span>
-              <span className="block text-sm font-medium">{t("agents.connectDialog.pairToggle")}</span>
-              <span className="block text-xs text-muted-foreground">{t("agents.connectDialog.pairToggleHint")}</span>
-            </span>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <PairCodeForm className="mt-3" onPaired={onPaired} showToast={showToast} />
-          </CollapsibleContent>
-        </Collapsible>
+        <LocalProjectCreate agentName={agentName} showToast={showToast} onCreated={onCreated} />
       </DialogBody>
 
       <DialogFooter>

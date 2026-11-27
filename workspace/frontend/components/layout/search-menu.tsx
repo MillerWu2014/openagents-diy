@@ -4,7 +4,7 @@ import { isRoutineSession } from '@/lib/conversation-list';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  BookOpen, Bot, CalendarClock, CircleDot, FileText, Globe, Inbox, MessageSquare, Search, Sparkles, Users, Waypoints,
+  Bot, CalendarClock, FileText, Globe, MessageSquare, Search, Sparkles, Users,
 } from 'lucide-react';
 import { useMe } from '@/hooks/use-me';
 import { canAccessSettingsSection } from '@/components/settings/admin-context';
@@ -72,14 +72,10 @@ export function SearchMenu({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const pages: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
     { mode: 'connect', label: agents.some((a) => !a.builtin) ? t('nav.manageAgents') : t('nav.connectAgent'), icon: <Bot /> },
     { mode: 'threads', label: t('views.threads'), icon: <MessageSquare /> },
-    { mode: 'issues', label: t('views.issues'), icon: <CircleDot /> },
     { mode: 'files', label: t('views.files'), icon: <FileText /> },
     { mode: 'browser', label: t('views.browser'), icon: <Globe /> },
     { mode: 'routines', label: t('views.routines'), icon: <CalendarClock /> },
-    { mode: 'knowledge', label: t('views.knowledge'), icon: <BookOpen /> },
-    { mode: 'inbox', label: t('views.inbox'), icon: <Inbox /> },
     { mode: 'skills', label: t('views.skills'), icon: <Sparkles /> },
-    { mode: 'workflows', label: t('views.workflows'), icon: <Waypoints /> },
     ...(workspace?.settings?.services_enabled === true
       ? [{ mode: 'agents' as const, label: t('collab.viewAgents'), icon: <Users /> }]
       : []),

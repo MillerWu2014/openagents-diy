@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import { Button } from "@renderer/components/ui/button"
 import {
   Dialog,
   DialogBody,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@renderer/components/ui/dialog"
@@ -48,8 +46,6 @@ export function ConnectWorkspaceDialog({
   onClose,
   showToast,
   onConnected,
-  importTool,
-  onImport,
 }: {
   open: boolean
   agentName: string
@@ -71,13 +67,10 @@ export function ConnectWorkspaceDialog({
   // null until the pairings have answered — an empty list is a real answer
   // ("this device is in no workspace") and the two must not read alike.
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[] | null>(null)
-  // Joined, and its past sessions are on offer.
-  const [offerImport, setOfferImport] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setWorkspaces(null)
-    setOfferImport(false)
     let cancelled = false
 
     void (async () => {
@@ -131,8 +124,7 @@ export function ConnectWorkspaceDialog({
       window.api.signalReload()
       showToast(t("agents.connectDialog.toast.connectedTo", { slug }), "success")
       onConnected()
-      if (importTool && onImport) setOfferImport(true)
-      else onClose()
+      onClose()
     } catch (err: unknown) {
       showToast(
         t("agents.connectDialog.toast.error", {
@@ -148,6 +140,12 @@ export function ConnectWorkspaceDialog({
   const onPaired = (joined: PairedWorkspace): void => {
     if (joined.workspaceSlug) void doConnect(joined.workspaceSlug)
     else setReload((n) => n + 1)
+  }
+
+  // The new-project form already paired this computer and bound the agents.
+  const onCreated = (): void => {
+    onConnected()
+    onClose()
   }
 
   return (
@@ -167,29 +165,7 @@ export function ConnectWorkspaceDialog({
           )}
         </DialogHeader>
 
-        {offerImport ? (
-          <>
-            <DialogBody>
-              <p className="text-sm text-muted-foreground" data-testid="connect-ws-import-offer">
-                {t("agents.connectDialog.importOffer", { tool: importTool })}
-              </p>
-            </DialogBody>
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                {t("agents.connectDialog.importLater")}
-              </Button>
-              <Button
-                data-testid="connect-ws-import"
-                onClick={() => {
-                  onClose()
-                  onImport?.()
-                }}
-              >
-                {t("agents.connectDialog.importNow")}
-              </Button>
-            </DialogFooter>
-          </>
-        ) : workspaces === null ? (
+        {workspaces === null ? (
           /* Not the empty state: until the pairings answer, "this device is in
              no workspace" is not yet known, and showing it would send the user
              off to re-pair a device that is paired. */
@@ -204,15 +180,18 @@ export function ConnectWorkspaceDialog({
              in the same step. A workspace that removed this device lands here
              too: it is gone from the list the moment its pairing is. */
           <ConnectWorkspacePair
+            agentName={agentName}
             onPaired={onPaired}
+            onCreated={onCreated}
             onCancel={onClose}
             showToast={showToast}
           />
         ) : (
           <ConnectWorkspacePicker
             options={options}
+            agentName={agentName}
             onConnect={(slug) => void doConnect(slug)}
-            onPaired={onPaired}
+            onCreated={onCreated}
             onCancel={onClose}
             showToast={showToast}
           />

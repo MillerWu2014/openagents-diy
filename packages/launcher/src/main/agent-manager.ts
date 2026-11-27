@@ -28,6 +28,8 @@ import {
   ensureDir,
 } from "./agents/paths"
 import { loadCore, readCoreVersion } from "./agents/runtime"
+import { localWorkspaceUrl } from "./local-workspace"
+import { agentsToMove } from "./agents/adopt-project"
 import {
   AMP_LOGGED_OUT,
   CORE_AGENTS,
@@ -952,9 +954,9 @@ export class AgentManager extends EventEmitter {
   /**
    * Change an existing agent's working directory (its spawn cwd, stored as the
    * `path` field in daemon.yaml). The folder is created up-front — a missing
-   * cwd makes the agent subprocess fail to spawn. The new cwd takes effect the
-   * next time the agent starts; a running agent is asked to reload so the
-   * daemon re-reads the config.
+   * cwd makes the agent subprocess fail to spawn. A running agent is restarted
+   * onto the new folder. A reload would leave it on the old one: the daemon
+   * restarts only when the workspace or env changes.
    *
    * The connector's published `config.updateAgent` is used directly here: the
    * top-level connector exposes no agent-path setter, and reimplementing the
@@ -979,16 +981,155 @@ export class AgentManager extends EventEmitter {
         "Updating the working directory isn't supported by the installed core. Please update, then try again.",
       )
     }
+    const current = this.listedAgents().find((agent) => agent.name === name)
+    if (current?.network) {
+      try { await this.rememberProjectDirectory(current.network, p) } catch { /* not a local project */ }
+    }
+    if (current?.path === p) return { success: true, path: p }
     config.updateAgent(name, { path: p })
     this._agentsCache = { value: [], at: 0 }
-    // Nudge the daemon to re-read daemon.yaml so a running agent picks up the
-    // new cwd on its next (re)start. Best-effort: a stopped daemon just means
-    // the change applies whenever it next starts the agent.
-    try {
-      const sendCmd = this._connector!.sendDaemonCommand as (c: string) => void
-      sendCmd?.call(this._connector, "reload")
-    } catch {}
+    // A stopped daemon reads the new path the next time it launches the agent.
+    if (this.getDaemonPid()) {
+      try {
+        const sendCmd = this._connector!.sendDaemonCommand as (c: string) => void
+        sendCmd?.call(this._connector, `restart:${name}`)
+      } catch {}
+    }
     return { success: true, path: p }
+  }
+
+  private listedAgents(): Array<{ name?: string; network?: string | null; path?: string | null }> {
+    const listAgents = this._connector?.listAgents as
+      | (() => Array<{ name?: string; network?: string | null; path?: string | null }>)
+      | undefined
+    return listAgents?.call(this._connector) || []
+  }
+
+  private localApiBase(): string {
+    return (this.configuredWorkspaceEndpoint() || localWorkspaceUrl()).replace(/\/$/, "")
+  }
+
+  private async localProjects(): Promise<Array<{ slug: string; directory?: string; token?: string }>> {
+    const res = await fetch(`${this.localApiBase()}/v1/local/projects`)
+    const json = await res.json().catch(() => null) as { data?: Array<{ slug: string; directory?: string }> } | null
+    if (!res.ok || !Array.isArray(json?.data)) return []
+    return json.data
+  }
+
+  /** Point an agent already in a local project at that project's folder. */
+  private async localProjectDirectory(slug: string): Promise<string> {
+    const projects = await this.localProjects()
+    return (projects.find((project) => project.slug === slug)?.directory || "").trim()
+  }
+
+  private async rememberProjectDirectory(slug: string, directory: string): Promise<void> {
+    const projects = await this.localProjects()
+    if (!projects.some((project) => project.slug === slug)) return
+    const res = await fetch(`${this.localApiBase()}/v1/local/projects/${encodeURIComponent(slug)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ directory }),
+    })
+    if (!res.ok) throw new Error("The project folder was not saved")
+  }
+
+  private _adoptGeneration = 0
+
+  /**
+   * The page the user is looking at. An agent process listens to one project,
+   * so the agents that belong to this one move onto it, including its folder.
+   * Agents already there are left running.
+   */
+  async adoptLocalProject(slug: string): Promise<void> {
+    const ref = (slug || "").trim()
+    if (!ref) return
+    const generation = ++this._adoptGeneration
+    try {
+      const projects = await this.localProjects()
+      if (generation !== this._adoptGeneration) return
+      const project = projects.find((item) => item.slug === ref)
+      if (!project?.token) return
+      const network = (this.getNetworks() as Array<{ id?: string; slug?: string }>).find(
+        (item) => item.slug === ref || item.id === ref,
+      )
+      if (!network?.id) return
+      const members = await this.projectAgentNames(network.id, project.token)
+      if (generation !== this._adoptGeneration) return
+      const moving = agentsToMove(members, this.listedAgents(), ref, project.directory || "")
+      for (const name of moving) {
+        if (generation !== this._adoptGeneration) return
+        try { await this.connectWorkspace(name, ref) } catch {}
+      }
+    } catch {}
+  }
+
+  private async projectAgentNames(workspaceId: string, token: string): Promise<string[]> {
+    const res = await fetch(
+      `${this.localApiBase()}/v1/discover?network=${encodeURIComponent(workspaceId)}`,
+      { headers: { "X-Workspace-Token": token } },
+    )
+    const json = await res.json().catch(() => null) as {
+      data?: { agents?: Array<{ address?: string; builtin?: boolean }> }
+    } | null
+    const agents = json?.data?.agents
+    if (!res.ok || !Array.isArray(agents)) return []
+    return agents.flatMap((agent) => {
+      if (agent.builtin) return []
+      const address = agent.address || ""
+      return address.startsWith("openagents:") ? [address.slice("openagents:".length)] : []
+    }).filter(Boolean)
+  }
+
+  /** Agents already joined to a project follow that project's folder. */
+  async syncProjectDirectories(): Promise<void> {
+    const projects = await this.localProjects()
+    const directory = new Map(projects.filter((project) => project.directory).map((project) => [project.slug, project.directory as string]))
+    for (const agent of this.listedAgents()) {
+      const folder = agent.network ? directory.get(agent.network) : undefined
+      if (!agent.name || !folder || folder === agent.path) continue
+      try { await this.setAgentWorkingDir(agent.name, folder) } catch {}
+    }
+  }
+
+  /**
+   * Create a project on this computer, pair the device, and bind the chosen
+   * agents to one folder. The steps are ordered: a project has to exist before
+   * it can be paired, and an agent can join only after the pairing is in.
+   */
+  async createLocalProject(input: {
+    name: string
+    directory: string
+    agents: string[]
+  }): Promise<{ slug: string; name: string; token: string }> {
+    const name = (input.name || "").trim()
+    const directory = (input.directory || "").trim()
+    const agents = [...new Set((input.agents || []).map((agent) => (agent || "").trim()).filter(Boolean))]
+    if (!name || name.length > 80) throw new Error("A project name is required (80 characters at most)")
+    if (!directory) throw new Error("A project folder is required")
+    if (agents.length === 0) throw new Error("Choose at least one agent")
+    const known = new Set((this.getAgents() as Array<{ name?: string }>).map((agent) => agent.name))
+    const missing = agents.filter((agent) => !known.has(agent))
+    if (missing.length) throw new Error(`Unknown agent: ${missing.join(", ")}`)
+
+    const base = (this.configuredWorkspaceEndpoint() || localWorkspaceUrl()).replace(/\/$/, "")
+    const post = async (path: string, body: unknown): Promise<Record<string, string>> => {
+      const res = await fetch(`${base}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => null) as { data?: Record<string, string>; message?: string } | null
+      if (!res.ok || !json?.data) throw new Error(json?.message || "The local project service did not answer")
+      return json.data
+    }
+    const created = await post("/v1/local/projects", { name, directory })
+    const paired = await post("/v1/local/pair", { slug: created.slug })
+    await this.connectNode(paired.code)
+    for (const agent of agents) {
+      // Joining applies the project's folder and restarts the agent on it.
+      await this.connectWorkspace(agent, created.slug)
+    }
+    return { slug: created.slug, name: created.name, token: created.token }
   }
 
   clearCatalogCache(): void {
@@ -1648,17 +1789,11 @@ export class AgentManager extends EventEmitter {
     const getDaemonPid = this._connector!.getDaemonPid as () => number | null
     const pid = getDaemonPid.call(this._connector)
     if (!pid) return
-
-    if (process.platform === "win32") {
-      const sendCmd = this._connector!.sendDaemonCommand as (
-        cmd: string,
-      ) => void
-      sendCmd.call(this._connector, "reload")
-    } else {
-      try {
-        process.kill(pid, "SIGHUP")
-      } catch {}
-    }
+    // A SIGHUP that arrives before the daemon installs its handler terminates
+    // the process. The command file is the same reload, and a daemon that is
+    // still starting simply applies it on the next poll.
+    const sendCmd = this._connector!.sendDaemonCommand as (cmd: string) => void
+    sendCmd.call(this._connector, "reload")
   }
 
   getNetworks(): unknown[] {
@@ -1717,7 +1852,17 @@ export class AgentManager extends EventEmitter {
     )
     const config = this._connector!.config as { updateAgent: (name: string, updates: Record<string, unknown>) => void }
     if (chosenConnection) config.updateAgent(agentName, { node_id: chosenConnection.node_id })
+    // The project owns the folder. The agent adopts it as it joins, so every
+    // session in the project runs there instead of whatever folder the agent
+    // was last configured with.
+    try {
+      const directory = await this.localProjectDirectory(workspaceRef)
+      if (directory) await this.setAgentWorkingDir(agentName, directory)
+    } catch {}
     this.signalReload()
+    // The workspace only lists an agent after its process joins. Binding the
+    // config is not that join.
+    await this.startAgent(agentName)
     return { success: true }
   }
 

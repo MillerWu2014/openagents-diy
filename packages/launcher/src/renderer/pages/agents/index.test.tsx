@@ -150,9 +150,7 @@ describe("Agents page — new agent connect flow", () => {
     )
   })
 
-  // Its tool keeps sessions on this computer: once it has joined, offer
-  // bringing them in — the workspace opens on its Import past sessions picker.
-  it("offers importing a new agent's past sessions once it joins", async () => {
+  it("does not offer importing a new agent's past sessions once it joins", async () => {
     const paired = {
       connected: true, workspaceSlug: "team-a", workspaceName: "Team A",
       workspaces: [{ nodeId: "n1", workspaceId: "id-1", workspaceSlug: "team-a" }], revoked: [],
@@ -171,11 +169,10 @@ describe("Agents page — new agent connect flow", () => {
     await user.click(await screen.findByRole("radio", { name: /team a/i }))
     await user.click(screen.getByRole("button", { name: /^connect$/i }))
 
-    expect((await screen.findByTestId("connect-ws-import-offer")).textContent).toContain("Claude Code")
-    await user.click(screen.getByTestId("connect-ws-import"))
     await waitFor(() =>
-      expect(api.openExternal).toHaveBeenCalledWith("https://workspace.openagents.org/team-a?import=my-new-agent"),
+      expect(screen.queryByTestId("connect-ws-import-offer")).toBeNull(),
     )
+    expect(api.openExternal).not.toHaveBeenCalled()
   })
 
   it("does not offer it when an existing agent joins a workspace", async () => {
@@ -352,13 +349,12 @@ describe("ConnectWorkspaceDialog — picking a workspace", () => {
     )
   })
 
-  // No second dialog: the code goes in right here, and once it is redeemed
-  // this agent joins the workspace it named in the same step.
-  it("pairs in place and joins the agent when this device is in no workspace", async () => {
+  it("joins the local project without a pairing code when this device is in no workspace", async () => {
     const api = installApi({
       listAgents: vi
         .fn()
         .mockResolvedValue([makeAgent({ name: "lonely", network: null })]),
+      getSetting: vi.fn().mockResolvedValue("http://127.0.0.1:18765"),
       connectNode: vi.fn().mockResolvedValue({
         connected: true,
         workspaceSlug: "fresh-ws",
@@ -366,20 +362,56 @@ describe("ConnectWorkspaceDialog — picking a workspace", () => {
         warning: null,
       }),
     })
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (String(url).endsWith("/v1/local/projects")) {
+        return new Response(JSON.stringify({ data: [{ slug: "project", name: "Project", token: "t" }] }), { status: 200 })
+      }
+      if (String(url).endsWith("/v1/local/pair")) {
+        return new Response(JSON.stringify({ data: { code: "ABCD2345", slug: "project", name: "Project" } }), { status: 200 })
+      }
+      return new Response("no", { status: 404 })
+    }))
     const user = await openConnectDialog(api)
 
-    await screen.findByText(/isn't in any workspace yet/i)
-    // Getting a code is a separate action: it opens the web app.
-    await user.click(screen.getByRole("button", { name: /get a pairing code/i }))
-    expect(api.openExternal).toHaveBeenCalledWith("https://workspace.openagents.org")
-
-    await user.type(screen.getByRole("textbox", { name: /^pairing code$/i }), "abcd2345")
-    await user.click(screen.getByTestId("ws-pair-submit"))
+    await user.click(await screen.findByRole("button", { name: /join project/i }))
+    expect(api.openExternal).not.toHaveBeenCalled()
 
     await waitFor(() => expect(api.connectNode).toHaveBeenCalledWith("ABCD2345"))
     await waitFor(() =>
       expect(api.connectWorkspace).toHaveBeenCalledWith("lonely", "fresh-ws"),
     )
+    vi.unstubAllGlobals()
+  })
+
+  it("creates a project from a name, a folder, and the selected agents", async () => {
+    const api = installApi({
+      listAgents: vi
+        .fn()
+        .mockResolvedValue([makeAgent({ name: "lonely", network: null })]),
+      getSetting: vi.fn().mockResolvedValue("http://127.0.0.1:18765"),
+      selectDirectory: vi.fn().mockResolvedValue("/tmp/market"),
+      createLocalProject: vi.fn().mockResolvedValue({ slug: "abcd", name: "Market", token: "tok" }),
+    })
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ data: [] }), { status: 200 }),
+    ))
+    const user = await openConnectDialog(api)
+
+    await screen.findByTestId("ws-none-paired")
+    await user.type(screen.getByRole("textbox", { name: /project name/i }), "Market")
+    expect(await screen.findByRole("checkbox", { name: "lonely" })).toBeChecked()
+    await user.click(screen.getByRole("button", { name: /choose folder/i }))
+    expect(await screen.findByDisplayValue("/tmp/market")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /^new project$/i }))
+
+    await waitFor(() => expect(api.createLocalProject).toHaveBeenCalledWith({
+      name: "Market",
+      directory: "/tmp/market",
+      agents: ["lonely"],
+    }))
+    expect(api.connectNode).not.toHaveBeenCalled()
+    expect(api.connectWorkspace).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 
   it("joins another workspace by code in place, and Cancel closes it", async () => {
@@ -395,10 +427,8 @@ describe("ConnectWorkspaceDialog — picking a workspace", () => {
     })
     const user = await openConnectDialog(api)
 
-    // Another workspace is a pairing code away, right here; nothing navigates
-    // the page out from under the open dialog.
-    expect(await screen.findByRole("button", { name: /join with a pairing code/i })).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: /add more workspaces/i })).toBeNull()
+    expect(await screen.findByRole("button", { name: /new project/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /join with a pairing code/i })).toBeNull()
 
     await user.click(screen.getByRole("button", { name: /^cancel$/i }))
     await waitFor(() => expect(screen.queryByTestId("connect-ws")).toBeNull())
@@ -434,7 +464,7 @@ describe("ConnectWorkspaceDialog — picking a workspace", () => {
     })
     await openConnectDialog(api)
 
-    await screen.findByText(/isn't in any workspace yet/i)
+    await screen.findByTestId("ws-none-paired")
     expect(screen.queryByRole("button", { name: /team a/i })).not.toBeInTheDocument()
     expect(api.connectWorkspace).not.toHaveBeenCalled()
   })
@@ -462,12 +492,10 @@ describe("ConnectWorkspaceDialog — picking a workspace", () => {
     await openConnectDialog(api)
 
     await waitFor(() => expect(api.refreshNodeStatus).toHaveBeenCalledWith(true))
-    await screen.findByText(/isn't in any workspace yet/i)
+    await screen.findByTestId("ws-none-paired")
   })
 
-  // Neither manual tokens nor a pairing form live here: this dialog picks from
-  // the workspaces this device has already joined, and does nothing else.
-  it("keeps the pairing code folded away behind its toggle", async () => {
+  it("does not ask for a pairing code", async () => {
     const api = installApi({
       listAgents: vi
         .fn()
@@ -478,12 +506,11 @@ describe("ConnectWorkspaceDialog — picking a workspace", () => {
       getNodeStatus: vi.fn().mockResolvedValue(PAIRED_TEAM_A),
       refreshNodeStatus: vi.fn().mockResolvedValue(PAIRED_TEAM_A),
     })
-    const user = await openConnectDialog(api)
+    await openConnectDialog(api)
 
     await screen.findByRole("radio", { name: /team a/i })
     expect(screen.queryByRole("textbox", { name: /^pairing code$/i })).not.toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: /join with a pairing code/i }))
-    expect(screen.getByRole("textbox", { name: /^pairing code$/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /join with a pairing code/i })).toBeNull()
     expect(api.connectNode).not.toHaveBeenCalled()
   })
 

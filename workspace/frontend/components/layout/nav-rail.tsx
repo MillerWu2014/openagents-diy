@@ -32,6 +32,8 @@ import {
 useLayout,type ViewMode
 } from './layout-context';
 import { DesktopNotificationPrompt } from '@/components/threads/desktop-notification-prompt';
+import { NewLocalProject } from './new-local-project';
+import { ProjectSwitcher } from './project-switcher';
 import { SearchMenu } from './search-menu';
 import { UserMenu } from './user-menu';
 import { SidebarMembers } from './sidebar-members';
@@ -122,44 +124,14 @@ export function NavRail() {
             showLabels ? 'w-full gap-2 p-1.5' : 'justify-center',
           )}
         >
-          <span
-            className="flex size-5 shrink-0 items-center justify-center overflow-hidden"
-            title={workspaceLabel}
-          >
-            <Image
-              src="/logo-black.png"
-              alt=""
-              width={20}
-              height={20}
-              className="size-full object-contain dark:hidden"
-            />
-            <Image
-              src="/logo-white.png"
-              alt=""
-              width={20}
-              height={20}
-              className="hidden size-full object-contain dark:block"
-            />
-          </span>
-
           {showLabels && (
-            <span
-              className="min-w-0 flex-1 truncate text-base font-semibold"
-              aria-label={workspaceLabel}
-              onMouseEnter={(event) => {
-                const label = event.currentTarget;
-                // Keep short names quiet. The native tooltip is added only
-                // when the ellipsis is actually hiding part of the name.
-                if (label.scrollWidth > label.clientWidth) {
-                  label.title = workspaceLabel;
-                } else {
-                  label.removeAttribute('title');
-                }
-              }}
-            >
-              {workspaceLabel}
+            <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden" title={workspaceLabel}>
+              <Image src="/logo-black.png" alt="" width={20} height={20} className="size-full object-contain dark:hidden" />
+              <Image src="/logo-white.png" alt="" width={20} height={20} className="hidden size-full object-contain dark:block" />
             </span>
           )}
+          <ProjectSwitcher name={workspaceLabel} slug={workspace?.slug} iconOnly={!showLabels} />
+          <NewLocalProject iconOnly={!showLabels} />
         </div>
       </SidebarHeader>
 

@@ -119,6 +119,17 @@
       {
         "from": "../../workspace/frontend/dist-desktop",
         "to": "workspace"
+      },
+      {
+        "from": "../../workspace/backend",
+        "to": "workspace-backend",
+        "filter": [
+          "**/*",
+          "!tests/**",
+          "!docs/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       }
     ],
     "directories": {

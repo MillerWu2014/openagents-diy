@@ -51,6 +51,8 @@ export interface AccountIpcDeps {
   nudgeNode: () => void
   /** Keeps the Workspace bundle current. Absent when nothing updates it (tests). */
   bundles?: Pick<WorkspaceBundleUpdater, "attach" | "pending" | "apply" | "pageReady" | "pageStarted" | "pageGone">
+  /** Bind this computer's agents to the local project just opened. */
+  adoptProject?: (slug: string) => Promise<void>
 }
 
 const NOTICE_TYPES = new Set(["info", "success", "error", "warning"])
@@ -100,6 +102,7 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
     // Main owns the tabs, so a renderer that reloads asks for them again
     // rather than losing track of pages that are still open.
     onTabsChanged: (snapshot) => deps.getWindow()?.webContents.send("workspace-tabs:changed", snapshot),
+    onProjectShown: (slug) => { void deps.adoptProject?.(slug) },
     bundle: deps.bundles,
   })
 
@@ -235,6 +238,10 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
   ipcMain.on("workspace-view:open-route", (event, route: unknown, title: unknown) => {
     if (host.isWorkspaceSender(event.sender)) host.openRoute(event.sender, route, title)
   })
+  ipcMain.on("workspace-view:focus-project", (event, slug: unknown) => {
+    if (host.isWorkspaceSender(event.sender) && typeof slug === "string") host.followSlug(slug)
+  })
+
   ipcMain.on("workspace-view:report-workspace", (event, info: unknown) => {
     if (host.isWorkspaceSender(event.sender)) host.reportWorkspace(event.sender, info)
   })

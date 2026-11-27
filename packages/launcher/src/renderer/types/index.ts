@@ -626,6 +626,7 @@ declare global {
       renameAgent(name: string, displayName: string): Promise<unknown>
       updateAgent(name: string, config: unknown): Promise<unknown>
       setAgentWorkingDir(name: string, dir: string): Promise<{ success: boolean; path?: string }>
+      createLocalProject(input: { name: string; directory: string; agents: string[] }): Promise<{ slug: string; name: string; token: string }>
       startAgent(name: string): Promise<unknown>
       stopAgent(name: string): Promise<unknown>
       startAll(): Promise<unknown>

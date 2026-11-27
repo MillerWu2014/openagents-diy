@@ -197,10 +197,18 @@
     "toast": {
       "connecting": "正在把 {{name}} 加入工作区…",
       "connectedTo": "已加入 {{slug}}",
+      "created": "项目已创建",
       "error": "错误：{{message}}"
     },
-    "emptyTitle": "这台设备还没有加入任何工作区",
-    "getCode": "获取配对码，加入工作区",
+    "emptyTitle": "加入这台电脑上的项目",
+    "joinLocal": "加入 {{name}}",
+    "createLocal": "新建项目",
+    "namePlaceholder": "项目名称",
+    "folderLabel": "项目目录",
+    "folderBrowse": "选择文件夹",
+    "folderPlaceholder": "选择一个本机文件夹",
+    "agentsLabel": "加入智能体",
+    "agentsEmpty": "这台电脑上还没有智能体",
     "pickHint": "选择要将此智能体实例加入的工作区。",
     "connect": "连接",
     "pairToggle": "使用配对码加入",
@@ -390,6 +398,7 @@
     "installAndSignIn": "安装并登录",
     "agentUnavailable": "此智能体已不可用，请返回智能体列表。",
     "folderHint": "默认使用您的主目录，也可为智能体选择项目文件夹。",
+    "projectFolderHint": "这个目录属于当前项目，项目里的每个会话都在这里运行。",
     "workdirOptional": "工作目录（可选）",
     "homeFolder": "您的主目录",
     "recommended": {

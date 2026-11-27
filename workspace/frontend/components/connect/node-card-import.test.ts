@@ -35,11 +35,10 @@ const render = (n: WorkspaceNode) => act(() => root.render(React.createElement(N
 })));
 const buttons = () => host.querySelectorAll<HTMLButtonElement>('[data-testid="node-agent-import"]');
 
-it('offers importing past sessions on the owner\'s rows of importable tools only', () => {
+it('does not offer importing past sessions', () => {
   render(node('Me@X.com'));
-  expect(buttons()).toHaveLength(1);
-  act(() => buttons()[0].click());
-  expect(opened).toHaveBeenCalledWith('my-codex');
+  expect(buttons()).toHaveLength(0);
+  expect(opened).not.toHaveBeenCalled();
 });
 
 it('does not offer it on someone else\'s device', () => {

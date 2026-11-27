@@ -104,7 +104,7 @@
     "unknown": "—"
   },
   "quickConnect": {
-    "title": "输入配对码，加入工作区",
+    "title": "加入这台电脑上的项目",
     "pairLabel": "配对码",
     "pairPlaceholder": "XXXX-XXXX",
     "pairBtn": "加入",

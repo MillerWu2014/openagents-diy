@@ -13,10 +13,14 @@ function installApi(overrides: Partial<Api> = {}): Api {
   const api: Api = {
     connectNode: vi.fn().mockResolvedValue({
       connected: true,
-      workspaceSlug: "paired-ws",
-      workspaceName: "Paired WS",
+      workspaceSlug: "project",
+      workspaceName: "Project",
       warning: null,
     }),
+    getSetting: vi.fn().mockResolvedValue("http://127.0.0.1:18765"),
+    listAgents: vi.fn().mockResolvedValue([{ name: "lonely", displayName: null, type: "claude", state: "stopped", health: null }]),
+    selectDirectory: vi.fn().mockResolvedValue("/tmp/market"),
+    createLocalProject: vi.fn().mockResolvedValue({ slug: "abcd", name: "Market", token: "tok" }),
     openExternal: vi.fn(),
     ...overrides,
   }
@@ -41,50 +45,39 @@ function renderDialog(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
 
-describe("WorkspaceQuickConnect — pairing only", () => {
-  it("offers the pair form and nothing else", () => {
+describe("WorkspaceQuickConnect — local projects", () => {
+  it("does not ask for a pairing code", async () => {
     installApi()
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ data: [] }), { status: 200 }),
+    ))
     renderDialog()
-    expect(screen.getByRole("textbox", { name: /^pairing code$/i })).toBeInTheDocument()
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument()
-    expect(screen.queryByText(/workspace name/i)).not.toBeInTheDocument()
-    // Creation is web-only; the form says where to get a code instead.
-    expect(screen.getByText(/how do i get a pairing code/i)).toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: "workspace.openagents.org" }),
-    ).toBeInTheDocument()
-    // The manual link/token path is gone, not demoted.
-    expect(screen.queryByTestId("qc-manual-toggle")).not.toBeInTheDocument()
-    expect(
-      screen.queryByLabelText(/workspace url or invitation token/i),
-    ).not.toBeInTheDocument()
+    expect(await screen.findByRole("heading", { name: /join a project on this computer/i })).toBeInTheDocument()
+    expect(screen.queryByRole("textbox", { name: /^pairing code$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "workspace.openagents.org" })).not.toBeInTheDocument()
+    expect(screen.queryByText(/how do i get a pairing code/i)).not.toBeInTheDocument()
   })
 
-  it("pairs with a normalized code", async () => {
+  it("joins a project on this computer without a code", async () => {
     const api = installApi()
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (String(url).endsWith("/v1/local/projects")) {
+        return new Response(JSON.stringify({ data: [{ slug: "project", name: "Project", token: "t" }] }), { status: 200 })
+      }
+      if (String(url).endsWith("/v1/local/pair")) {
+        return new Response(JSON.stringify({ data: { code: "ABCD2345", slug: "project", name: "Project" } }), { status: 200 })
+      }
+      return new Response("no", { status: 404 })
+    }))
     renderDialog()
     const user = userEvent.setup()
-
-    await user.type(screen.getByRole("textbox", { name: /^pairing code$/i }), "abcd-2345")
-    await user.click(screen.getByRole("button", { name: /^join$/i }))
-
+    await user.click(await screen.findByRole("button", { name: /join project/i }))
     await waitFor(() => expect(api.connectNode).toHaveBeenCalledWith("ABCD2345"))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(onCreated).toHaveBeenCalled()
-  })
-
-  it("rejects a short code without calling the API", async () => {
-    const api = installApi()
-    renderDialog()
-    const user = userEvent.setup()
-
-    await user.type(screen.getByRole("textbox", { name: /^pairing code$/i }), "abc")
-    // The submit button is disabled for short codes; Enter in the field
-    // exercises the validation path instead.
-    await user.keyboard("{Enter}")
-    expect(await screen.findByText(/8 characters/i)).toBeInTheDocument()
-    expect(api.connectNode).not.toHaveBeenCalled()
+    expect(api.openExternal).not.toHaveBeenCalled()
   })
 })

@@ -56,8 +56,8 @@
   "themeToggle": "主题",
   "modeLauncher": "此电脑",
   "modeLauncherShort": "此电脑",
-  "modeWorkspace": "工作区",
-  "modeSwitch": "在此电脑与工作区之间切换",
+  "modeWorkspace": "项目",
+  "modeSwitch": "在此电脑与项目之间切换",
   "toggleSidebar": "展开或收起侧栏",
   "help": {
     "label": "帮助",

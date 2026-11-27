@@ -28,32 +28,28 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 const render = (skip: boolean) => act(() => root.render(React.createElement(Harness, { skip })));
 
-it('offers importing past sessions when an agent of an importable tool joins', () => {
+it('announces a joined agent without offering to import past sessions', () => {
   render(false);
   announce('my-codex');
   const [, opts] = toast.success.mock.calls[0];
-  expect(opts.description).toBe('importSessions.joinedHint');
-  opts.action.onClick();
-  expect(opened).toHaveBeenCalledWith('my-codex');
+  expect(opts.action.label).toBe('connect.viewAgent');
+  expect(opts.description).toBeUndefined();
+  expect(opened).not.toHaveBeenCalled();
 });
 
-it('makes no offer for other tools', () => {
+it('makes no import offer for other tools', () => {
   render(false);
   announce('my-aider');
   const [, opts] = toast.success.mock.calls[0];
   expect(opts.action.label).toBe('connect.viewAgent');
   expect(opts.description).toBeUndefined();
+  expect(opened).not.toHaveBeenCalled();
 });
 
-it('still offers it during onboarding, which skips the joined notice', () => {
+it('stays quiet during onboarding', () => {
   render(true);
-  announce('my-aider');
-  expect(toast).not.toHaveBeenCalled();
   announce('my-codex');
   expect(toast.success).not.toHaveBeenCalled();
-  const [message, opts] = toast.mock.calls[0];
-  expect(message).toContain('importSessions.onboardingOffer');
-  expect(message).toContain('Codex');
-  opts.action.onClick();
-  expect(opened).toHaveBeenCalledWith('my-codex');
+  expect(toast).not.toHaveBeenCalled();
+  expect(opened).not.toHaveBeenCalled();
 });

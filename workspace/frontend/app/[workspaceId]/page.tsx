@@ -1,9 +1,10 @@
 'use client';
 
 import { getApiBaseUrl } from '@/lib/api-base';
+import { localProjectHref, readLocalProject } from '@/lib/local-project';
 
 import { use, Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { WorkspaceProvider, useWorkspace } from '@/lib/workspace-context';
 import { LayoutProvider } from '@/components/layout/layout-context';
 import { Wrapper } from '@/components/layout/wrapper';
@@ -184,13 +185,18 @@ function BearerWorkspace({ workspaceId, idToken }: { workspaceId: string; idToke
 }
 
 function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
+  const t = useT();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlToken = searchParams.get('token');
   const [token, setToken] = useState<string | null>(urlToken);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (urlToken) {
       setToken(urlToken);
+      setFailed(false);
       setWorkspaceCookie(workspaceId, urlToken);
       return;
     }
@@ -198,15 +204,40 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     (async () => {
       try {
         const res = await fetch(`${getApiBaseUrl()}/v1/local/project`, { cache: 'no-store' });
-        const body = await res.json();
-        const project = body.data || body;
-        if (cancelled || !project?.token) return;
-        setWorkspaceCookie(project.slug || workspaceId, project.token);
+        const project = readLocalProject(res.status, await res.json().catch(() => null));
+        if (cancelled) return;
+        if (!project) throw new Error('no local project');
+        // A restored tab can name a workspace this install no longer has.
+        // Open the local project instead of spinning on the old id.
+        if (project.slug !== workspaceId) {
+          router.replace(localProjectHref(project));
+          return;
+        }
+        setWorkspaceCookie(project.slug, project.token);
         setToken(project.token);
-      } catch { /* splash stays until a later retry */ }
+        setFailed(false);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
     })();
     return () => { cancelled = true; };
-  }, [workspaceId, urlToken]);
+  }, [workspaceId, urlToken, router, attempt]);
+
+  if (failed) {
+    return (
+      <Empty className="min-h-screen rounded-none bg-background">
+        <EmptyHeader>
+          <EmptyTitle className="text-xl font-semibold">{t('workspaceGate.loadFailedTitle')}</EmptyTitle>
+          <EmptyDescription>{t('workspaceGate.loadFailedBody')}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent className="flex-row justify-center gap-2">
+          <Button variant="outline" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}>
+            {t('common.retry')}
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
 
   if (!token) return <WorkspaceLoadingSplash />;
 

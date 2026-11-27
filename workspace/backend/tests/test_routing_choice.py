@@ -59,6 +59,19 @@ def test_sender_can_assign_once_with_original_context(client, workspace, thread,
     assert db.get(EventRecord, event['id']).metadata_['routing_choice']['status'] == 'assigned'
 
 
+def test_workspace_token_assigns_as_the_message_sender(client, workspace, thread, db):
+    event = post(client, workspace, thread)
+    with patch('app.services.cloud_agent.invoke_cloud_agents'):
+        response = client.post(
+            f"/v1/events/{event['id']}/routing?network={workspace['id']}",
+            headers={"X-Workspace-Token": workspace["token"]},
+            json={"agent": "agent-beta"},
+        )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["status"] == "assigned"
+    assert response.json()["data"]["agent"] == "agent-beta"
+
+
 def test_other_human_cannot_resolve_or_dismiss(client, workspace, thread):
     event = post(client, workspace, thread)
     for agent in ('agent-beta', None):

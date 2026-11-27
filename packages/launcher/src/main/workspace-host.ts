@@ -79,6 +79,8 @@ export interface WorkspaceHostDeps {
   onExternalLogin: () => void
   /** The tab strip changed: opened, closed, switched, renamed or reloaded. */
   onTabsChanged?: (snapshot: WorkspaceTabsSnapshot) => void
+  /** The project the user is now looking at. Agents that belong to it follow. */
+  onProjectShown?: (slug: string) => void
   /**
    * Told when a page starts loading the bundle, and when a page goes, so a
    * downloaded bundle that does not start can be caught. See bundle-ota.
@@ -113,14 +115,14 @@ interface ViewEntry {
 
 export class WorkspaceHost implements BundlePages {
   private _home: ViewEntry | null = null
+  /** The project whose agents were last asked to follow this screen. */
+  private _shownProject: string | null = null
   private _tabs: ViewEntry[] = []
   private _active: ViewEntry | null = null
   /** The entry whose view is in the window right now. */
   private _attached: ViewEntry | null = null
   /** Whether the renderer wants a workspace on screen (between show and hide). */
   private _visible = false
-  /** The first All Workspaces load of a session resumes the last route. */
-  private _resumed = false
   private _nextTab = 1
   private _bounds: ViewBounds = { x: 0, y: 0, width: 0, height: 0 }
   /** The window whose reloads are already being watched. See _guardAgainstReload. */
@@ -258,20 +260,22 @@ export class WorkspaceHost implements BundlePages {
     }
     this._bounds = bounds
     if (target) this._active = this._openTab(target, token ?? null, sessionId ?? null, title ?? null, importAgent ?? null)
-    else if (!this._active) this._active = this._ensureHome(true)
+    else if (!this._active) this._active = this._ensureHome()
     this._visible = true
     this._attachActive()
     this.setBounds(bounds)
     this._emit()
+    this._follow(this._active)
   }
 
   /** Bring a tab, or the All Workspaces page, forward. */
   activate(id: string): void {
-    const entry = id === WORKSPACE_HOME_TAB ? this._ensureHome(false) : this._tabs.find((tab) => tab.id === id)
+    const entry = id === WORKSPACE_HOME_TAB ? this._ensureHome() : this._tabs.find((tab) => tab.id === id)
     if (!entry) return
     this._active = entry
     this._attachActive()
     this._emit()
+    this._follow(entry)
   }
 
   /** Move a tab to `index` in the strip, as dragging it there does. */
@@ -294,7 +298,7 @@ export class WorkspaceHost implements BundlePages {
     if (!entry) return
     if (this._active === entry) {
       const next = neighbourAfterClose(this._tabs.map((tab) => tab.id), id)
-      this._active = this._tabs.find((tab) => tab.id === next) ?? this._ensureHome(false)
+      this._active = this._tabs.find((tab) => tab.id === next) ?? this._ensureHome()
     }
     this._tabs = this._tabs.filter((tab) => tab !== entry)
     this._discard(entry)
@@ -312,7 +316,7 @@ export class WorkspaceHost implements BundlePages {
     if (!closing.length) return
     this._tabs = this._tabs.filter((tab) => !closing.includes(tab))
     if (this._active && closing.includes(this._active)) {
-      this._active = this._tabs.find((tab) => tab.id === keep) ?? this._ensureHome(false)
+      this._active = this._tabs.find((tab) => tab.id === keep) ?? this._ensureHome()
     }
     for (const entry of closing) this._discard(entry)
     this._attachActive()
@@ -343,7 +347,7 @@ export class WorkspaceHost implements BundlePages {
   /** The All Workspaces page, at its list rather than wherever it was left. */
   openHome(): void {
     const existed = !!this._home
-    const home = this._ensureHome(false)
+    const home = this._ensureHome()
     if (existed && home.view.webContents.getURL() !== home.baseUrl) this._load(home, home.baseUrl)
     this._active = home
     this._attachActive()
@@ -410,6 +414,8 @@ export class WorkspaceHost implements BundlePages {
       this._discard(entry)
       this._attachActive()
     }
+    const shown = original ?? entry
+    if (this._active === shown) this._follow(shown)
     this._emit()
   }
 
@@ -504,8 +510,20 @@ export class WorkspaceHost implements BundlePages {
     this._home = null
     this._tabs = []
     this._active = null
-    this._resumed = false
     this._emit()
+  }
+
+  /** The page is about to show this project. Its agents should get there first. */
+  followSlug(slug: string): void {
+    if (!slug || slug.length > 200 || slug === this._shownProject) return
+    this._shownProject = slug
+    this._deps.onProjectShown?.(slug)
+  }
+
+  /** The open project changed, so its agents should be the ones listening. */
+  private _follow(entry: ViewEntry | null): void {
+    const slug = entry && entry !== this._home ? entry.slug : null
+    if (slug) this.followSlug(slug)
   }
 
   private _origin(): string {
@@ -544,16 +562,15 @@ export class WorkspaceHost implements BundlePages {
   }
 
   /**
-   * The All Workspaces page, created on first use. The first one of a session
-   * may resume where the user last was, which is how reopening the app lands
-   * back in the workspace it was closed on.
+   * The workspace home, created on first use. It opens the local project
+   * itself. Resuming a saved route here brought back a workspace id from an
+   * older install, and that page waited forever on a project it could not load.
    */
-  private _ensureHome(resume: boolean): ViewEntry {
+  private _ensureHome(): ViewEntry {
     if (this._home) return this._home
     const home = this._createEntry(WORKSPACE_HOME_TAB, this._bundleOr("/"))
     this._home = home
-    this._load(home, resume && !this._resumed && bundleExists() ? workspaceBundleUrl("/?desktop_resume=1") : home.baseUrl)
-    this._resumed = true
+    this._load(home, home.baseUrl)
     return home
   }
 

@@ -1,8 +1,14 @@
 /* Tailwind Core */
 @import 'tailwindcss';
+@import 'katex/dist/katex.min.css';
 
 @import 'tw-animate-css';
 @import './shadcn-tailwind.css';
+
+.markdown-content .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 
 /** Dark Mode Variant **/
 @custom-variant dark (&:is(.dark *));

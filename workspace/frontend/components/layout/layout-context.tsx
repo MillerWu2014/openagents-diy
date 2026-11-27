@@ -21,6 +21,12 @@ import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils'
 
 export type ViewMode = 'threads' | 'files' | 'knowledge' | 'browser' | 'issues' | 'workflows' | 'routines' | 'inbox' | 'connect' | 'skills' | 'agents';
 
+/** Issues, knowledge, inbox, and workflows are gone. Sessions stay on threads. */
+const RETIRED_VIEWS = new Set<ViewMode>(['issues', 'knowledge', 'inbox', 'workflows']);
+export function keptView(mode: ViewMode): ViewMode {
+  return RETIRED_VIEWS.has(mode) ? 'threads' : mode;
+}
+
 /** The Files view has two halves the folder panel switches between. */
 export type FilesSection = 'folders' | 'trash';
 
@@ -240,12 +246,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [viewMode, setViewMode] = useState<ViewMode>('threads');
   useEffect(() => {
     const resource = requestedResource(window.location.href);
-    if (resource) setViewMode(resource.view);
+    if (resource) setViewMode(keptView(resource.view));
     // `?view=connect` from a settings page: open Manage Agents, then drop the
     // parameter so a reload lands on the workspace as usual.
     const view = requestedView(window.location.href);
     if (view) {
-      setViewMode(view);
+      setViewMode(keptView(view));
       window.history.replaceState(window.history.state, '', withoutRequestedView(window.location.href));
     }
   }, []);
@@ -321,14 +327,15 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [, startViewTransition] = useTransition();
   const [railViewMode, setRailViewMode] = useOptimistic(viewMode);
   const openView = (mode: ViewMode) => {
+    const next = keptView(mode);
     startViewTransition(() => {
-      setRailViewMode(mode);
-      setViewMode(mode);
+      setRailViewMode(next);
+      setViewMode(next);
       // Files is the exception: its list pane is a folder tree, and what you want
       // on opening it is usually the file you or an agent just added — which is
       // the detail pane's recent listing. The tree stays one tap away, and any
       // folder already selected is what the pane opens on.
-      setMobilePane(mode === 'files' ? 'detail' : 'list');
+      setMobilePane(next === 'files' ? 'detail' : 'list');
     });
   };
 

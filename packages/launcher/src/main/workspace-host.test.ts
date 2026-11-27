@@ -92,10 +92,10 @@ describe('shared workspace host', () => {
     )
     expect(fakes.views).toHaveLength(1)
   })
-  it('resumes on first load and preserves the live page when returning from local management', () => {
+  it('opens the workspace home and preserves the live page when returning from local management', () => {
     const host = makeHost()
     host.show(null, bounds)
-    expect(contents(0).loadURL).toHaveBeenCalledWith('openagents://workspace/index.html#/?desktop_resume=1')
+    expect(contents(0).loadURL).toHaveBeenCalledWith('openagents://workspace/index.html#/')
     host.hide(); host.show(null, bounds)
     expect(contents(0).loadURL).toHaveBeenCalledTimes(1)
   })
@@ -268,6 +268,25 @@ describe('workspace tabs', () => {
     expect(fakes.views).toHaveLength(2)
     host.openRoute(contents(1) as never, '/')
     expect(last(host).active).toBe('home')
+  })
+  it('follows the project the open page names, and again when that tab comes forward', () => {
+    const onProjectShown = vi.fn()
+    const win = { webContents:{ on:vi.fn() }, contentView:{ addChildView:vi.fn(), removeChildView:vi.fn() } }
+    const host = new WorkspaceHost({
+      getWindow:() => win as never, endpoint:() => undefined, session:() => null,
+      onExternalLogin:vi.fn(), onProjectShown,
+    })
+    host.show('blog', bounds)
+    host.reportWorkspace(contents(0) as never, { id:'ws_blog', slug:'blog', name:'blog' })
+    host.reportWorkspace(contents(0) as never, { id:'ws_blog', slug:'blog', name:'blog' })
+    expect(onProjectShown).toHaveBeenCalledTimes(1)
+    expect(onProjectShown).toHaveBeenCalledWith('blog')
+    host.show('stands', bounds)
+    host.reportWorkspace(contents(1) as never, { id:'ws_stands', slug:'stands', name:'机位分配' })
+    expect(onProjectShown).toHaveBeenLastCalledWith('stands')
+    const blog = host.snapshot().tabs[0].id
+    host.activate(blog)
+    expect(onProjectShown).toHaveBeenLastCalledWith('blog')
   })
   it('names a tab from its page and folds the same workspace opened twice into one tab', () => {
     const host = makeHost()

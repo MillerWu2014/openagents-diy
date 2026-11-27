@@ -77,6 +77,14 @@ describe("shared agent setup local backend", () => {
     expect(api.setAgentWorkingDir).toHaveBeenCalledExactlyOnceWith("helper", "/project")
     expect(api.addAgent).not.toHaveBeenCalled()
   })
+  it("records an unchanged folder on the project the agent has joined", async () => {
+    const { api, config, backend } = fixture()
+    config.name = "helper"; config.initial = { ...config.values }
+    api.listAgents.mockResolvedValue([{ name: "helper", type: "claude", path: "/project", network: "stands" }])
+    await backend.enqueueNodeCommand("this-computer", "configure_agent", { name: "helper", type: "claude", workingDir: "/project" })
+    expect(api.setAgentWorkingDir).toHaveBeenCalledExactlyOnceWith("helper", "/project")
+    expect(api.saveAgentInstanceEnv).not.toHaveBeenCalled()
+  })
   it("makes no writes when existing settings are saved unchanged", async () => {
     const { api, config, backend } = fixture()
     config.name = "helper"; config.initial = { ...config.values }

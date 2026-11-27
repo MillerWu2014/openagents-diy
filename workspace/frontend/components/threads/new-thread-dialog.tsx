@@ -52,13 +52,12 @@ interface NewThreadDialogProps {
 
 export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammates = [], onCreateThread }: NewThreadDialogProps) {
   const t = useT();
-  // Only show online agents in the picker
+  // Every agent in the project can join a session. Online is not required:
+  // an agent that was just added is still connecting, and the session waits for it.
   const availableAgents = agents.filter(a => !a.builtin && a.canStartThread !== false);
-  const onlineAgents = availableAgents.filter((a) => a.status === 'online');
-  const offlineAgentCount = availableAgents.length - onlineAgents.length;
-  // Personal assistants are only available through direct conversations.
-  const agentNames = onlineAgents.map((a) => a.agentName);
-  const bulkNames = onlineAgents.filter((a) => !a.builtin).map((a) => a.agentName);
+  const offlineAgentCount = availableAgents.filter((a) => a.status !== 'online').length;
+  const agentNames = availableAgents.map((a) => a.agentName);
+  const bulkNames = availableAgents.filter((a) => !a.builtin).map((a) => a.agentName);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [resumeFrom, setResumeFrom] = useState<string>(NO_RESUME);
@@ -76,7 +75,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
       kind: 'human' as const, id: person.email,
       label: person.displayName || person.email, detail: person.displayName ? person.email : '',
     })),
-    ...onlineAgents.map((agent) => ({
+    ...availableAgents.map((agent) => ({
       kind: 'agent' as const, id: agent.agentName,
       label: agentLabel(agent), detail: t('newThread.agent'),
     })),
@@ -91,11 +90,11 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
     });
   };
 
-  // Reset state when dialog opens. When there's exactly one online agent,
-  // pre-select it so the common single-agent case is a one-click "Start Thread".
+  // Reset state when dialog opens. When the project has exactly one agent,
+  // pre-select it so starting a session is one click.
   useEffect(() => {
     if (open) {
-      setSelected(onlineAgents.length === 1 ? new Set([onlineAgents[0].agentName]) : new Set());
+      setSelected(availableAgents.length === 1 ? new Set([availableAgents[0].agentName]) : new Set());
       setResumeFrom(NO_RESUME);
       setVisibility('private');
       setSelectedPeople(new Set());
@@ -130,7 +129,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, teammate
   );
 
   // Check if any selected agent is a Claude Code agent (heuristic: agent type or name contains 'claude')
-  const hasClaudeAgent = onlineAgents.some(
+  const hasClaudeAgent = availableAgents.some(
     (a) => selected.has(a.agentName) && /claude/i.test(a.agentName)
   );
 

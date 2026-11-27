@@ -100,6 +100,7 @@ import {
 } from "./workspace-bundle"
 import { createWorkspaceBundleUpdater, type WorkspaceBundleUpdater } from "./bundle-ota"
 import { normalizeWorkspaceEndpoint } from "./agents/env-normalize"
+import { ensureLocalWorkspace, localWorkspaceUrl, servesLocalWorkspace, stopLocalWorkspace } from "./local-workspace"
 import { attachRendererLogging, rendererLogPath } from "./renderer-log"
 import { crashLoopGuard, startStallWatchdog } from "./responsiveness"
 import {
@@ -1213,6 +1214,21 @@ function setupIPC(): void {
       asPath(dir, "working directory"),
     ),
   )
+  ipcMain.handle("agents:create-local-project", (_e, input: unknown) => {
+    const body = (input && typeof input === "object" ? input : {}) as {
+      name?: unknown
+      directory?: unknown
+      agents?: unknown
+    }
+    const agents = Array.isArray(body.agents)
+      ? body.agents.map((name) => asName(name, "agent name"))
+      : []
+    return requireManager().createLocalProject({
+      name: asName(body.name, "project name"),
+      directory: asPath(body.directory, "project folder"),
+      agents,
+    })
+  })
 
   ipcMain.handle("agents:start", (_e, name) =>
     requireManager().startAgent(name),
@@ -2671,7 +2687,8 @@ function setupIPC(): void {
   // module: signing in gates the workspace half of the app. Earlier handlers
   // read the manager when invoked, after setup has finished.
   accountManager = registerAccountIpc({
-    endpoint: () => normalizeWorkspaceEndpoint(store.get("workspaceEndpoint")),
+    endpoint: () =>
+      normalizeWorkspaceEndpoint(store.get("workspaceEndpoint")) || localWorkspaceUrl(),
     getWindow: () => mainWindow,
     // Both run only for "Connect this computer" in the workspace, which asks
     // for this device to come online — so they turn the local connector on.
@@ -2685,6 +2702,7 @@ function setupIPC(): void {
       return requireManager()._ensureDaemon()
     },
     nudgeNode: () => agentManager?.nudgeNodeHeartbeat(),
+    adoptProject: (slug) => requireManager().adoptLocalProject(slug),
     bundles: workspaceBundles ?? undefined,
     // The launcher's own look and feel, which the hosted workspace shares.
     // `nativeTheme.themeSource` is already the mode the renderer put there
@@ -2728,10 +2746,20 @@ if (!gotLock) {
 }
 
 app.whenReady().then(async () => {
+  // The bundled workspace opens one local project. Without this, the page asks
+  // the hosted API for /v1/local/project, gets a 404, and stays on the splash.
+  const configured = normalizeWorkspaceEndpoint(store.get("workspaceEndpoint"))
+  // A saved local address is not a running server. The last launch wrote it
+  // down, then quit and took the process with it.
+  if (servesLocalWorkspace(configured)) {
+    const ready = await ensureLocalWorkspace()
+    if (ready && !configured) store.set("workspaceEndpoint", localWorkspaceUrl())
+  }
   // Which Workspace bundle to serve — a verified download newer than the one
   // that shipped, or that one — decided before the first page asks for it.
   workspaceBundles = createWorkspaceBundleUpdater({
-    endpoint: () => normalizeWorkspaceEndpoint(store.get("workspaceEndpoint")),
+    endpoint: () =>
+      normalizeWorkspaceEndpoint(store.get("workspaceEndpoint")) || localWorkspaceUrl(),
     autoUpdate: () => store.get("autoUpdate") !== false,
   })
   // The bundled workspace app, served off disk over that scheme.
@@ -3223,7 +3251,10 @@ app.whenReady().then(async () => {
     // the core is actually loaded before we ask it to start anything; a failure
     // here is non-fatal, the user can still start each agent by hand. No
     // daemon means the local connector is off, which auto-start must not undo.
-    .then((ready) => {
+    .then(async (ready) => {
+      if (ready) {
+        try { await agentManager?.syncProjectDirectories() } catch {}
+      }
       if (!ready || store.get("agentAutoStart") !== true) return
       slog("agentAutoStart is on — starting all configured agents")
       return agentManager?.startAll()
@@ -3315,6 +3346,7 @@ app.on("activate", () => {
 })
 
 app.on("before-quit", () => {
+  stopLocalWorkspace()
   ;(app as typeof app & { isQuitting: boolean }).isQuitting = true
   try {
     cliLogin?.disposeAll()

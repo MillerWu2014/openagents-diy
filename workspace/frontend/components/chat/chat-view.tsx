@@ -5,7 +5,6 @@ import { AgentMessageAccessProvider } from './agent-message-access';
 import { ThreadResources } from './thread-resources';
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
-import { YumiGuide } from './yumi-guide';
 import { ChatInput } from './chat-input';
 import { ReplyCitation, citationFor } from './reply-citation';
 import { ThreadStatusBar } from './thread-status-bar';
@@ -24,7 +23,6 @@ import { useRoutines } from '@/components/routines/use-routines';
 import { useRoutineNavigation } from '@/components/routines/use-routine-navigation';
 import { RoutineDialog } from '@/components/routines/routine-dialog';
 import type { RoutineItem, WorkspaceMessage } from '@/lib/types';
-import { isYumiWelcome } from '@/lib/yumi-onboarding';
 import { useT } from '@/lib/i18n';
 import { useBrief } from './work-brief';
 import { useMe } from '@/hooks/use-me';
@@ -146,12 +144,6 @@ export function ChatView() {
     const dismissKey = JSON.stringify([workspaceKey, currentSessionId, entry.nodeId, name, entry.probe.at]);
     return dismissedProbes.has(dismissKey) ? [] : [{ name, entry, dismissKey }];
   });
-  const yumi = agents.find((agent) => agent.builtin && agent.agentName === 'yumi');
-  const isYumiDm = !!yumi && isDM && dmCounterpart === `openagents:${yumi.agentName}`;
-  const hasYumi = !!yumi && (isYumiDm || (!isDM && participants.includes(yumi.agentName)));
-  const lastMessage = chatLogMessages.at(-1);
-  const hasInlineWelcome = !!lastMessage && isYumiWelcome(lastMessage, yumi);
-  const showYumiGuide = hasYumi && !loading && !hasInlineWelcome && (!isYumiDm || displayMessages.length > 0);
   const canCompose = !isDM || dmWritable;
   const appendMention = (email: string) => {
     const separator = currentDraft && !/\s$/.test(currentDraft) ? ' ' : '';
@@ -186,12 +178,11 @@ export function ChatView() {
       {!isDM && currentSessionId && isSharedThreadName(currentSessionId) && <WorkspaceGuestRequests key={currentSessionId} channel={currentSessionId} />}
       {!needsConnection && <OfflineAgentsBanner participants={participants} agents={agents} />}
       <ProbeFailureBanner failing={failingProbes} retesting={retesting} onRetest={retestAgent} onDismiss={dismissProbe} />
-      {needsConnection && !dmWithPerson && !hasYumi && <ConnectAgentNotice onConnect={() => openView('connect')} />}
+      {needsConnection && !dmWithPerson && <ConnectAgentNotice onConnect={() => openView('connect')} />}
 
       {/* Messages */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <ThreadLiveBrowser key={`live-browser:${currentSessionId}`} messages={browserMessages} />
-        {showYumiGuide && <YumiGuide showSetup={!agents.some((agent) => !agent.builtin)} canStartThread={hasConnectedAgent} />}
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
             <Spinner className="size-6 text-muted-foreground" />

@@ -104,6 +104,14 @@ it('names the thread with the typed title, trimmed, and leaves a blank one to au
 });
 
 
+it('offers an offline project agent so a session can be created', async () => {
+  const create = vi.fn().mockResolvedValue(undefined);
+  await render([{ agentName: 'codex', status: 'offline' } as WorkspaceAgent], create, []);
+  expect(document.body.textContent).toContain('codex');
+  await act(async () => button('newThread.start').click());
+  expect(create).toHaveBeenCalledWith(expect.objectContaining({ participants: ['codex'] }));
+});
+
 it('excludes the built-in assistant from new thread participants', async () => {
   vi.spyOn(workspaceApi, 'listGroups').mockResolvedValue([]);
   const host = document.createElement('div'); document.body.append(host); root = createRoot(host);

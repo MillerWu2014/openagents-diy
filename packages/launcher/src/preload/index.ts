@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('agents:rename', name, displayName),
   updateAgent: (name: string, config: unknown) => ipcRenderer.invoke('agents:update', name, config),
   setAgentWorkingDir: (name: string, dir: string) => ipcRenderer.invoke('agents:set-workdir', name, dir),
+  createLocalProject: (input: { name: string; directory: string; agents: string[] }) =>
+    ipcRenderer.invoke('agents:create-local-project', input),
 
   startAgent: (name: string) => ipcRenderer.invoke('agents:start', name),
   stopAgent: (name: string) => ipcRenderer.invoke('agents:stop', name),
