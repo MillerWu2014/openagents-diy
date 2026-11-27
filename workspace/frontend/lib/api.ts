@@ -1,5 +1,6 @@
 import { normalizePolicyRequirements } from './approvals';
 import { getApiBaseUrl, getProjectPreviewUrl } from '@/lib/api-base';
+import type { AccountProfile } from '@/lib/account-api';
 import type { ProjectPreview, ProjectUpload } from './web-projects';
 import type { ArtifactReference, ThreadArtifactSetting } from './thread-artifacts';
 import type { GuestLink, ThreadGuestRecord } from './guest-links';
@@ -406,6 +407,22 @@ class WorkspaceApi {
   /** Who am I in this workspace? Drives client-side gating of admin UI. */
   async getMe(): Promise<WorkspaceMe> {
     return this.request<WorkspaceMe>(`/v1/workspaces/${this.requireWorkspace()}/me`);
+  }
+
+  /** Name and avatar of the person these credentials belong to. */
+  async getAccountProfile(): Promise<AccountProfile> {
+    return this.request<AccountProfile>('/v1/account/profile');
+  }
+
+  async updateAccountProfile(updates: { displayName?: string; avatarUrl?: string; welcomeSeen?: boolean }): Promise<AccountProfile> {
+    return this.request<AccountProfile>('/v1/account/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        ...(updates.displayName !== undefined ? { display_name: updates.displayName } : {}),
+        ...(updates.avatarUrl !== undefined ? { avatar_url: updates.avatarUrl } : {}),
+        ...(updates.welcomeSeen !== undefined ? { welcome_seen: updates.welcomeSeen } : {}),
+      }),
+    });
   }
 
   async getTeam(): Promise<TeamMember[]> {

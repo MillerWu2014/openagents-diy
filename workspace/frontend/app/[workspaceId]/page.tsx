@@ -189,11 +189,13 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlToken = searchParams.get('token');
+  const member = searchParams.get('member');
   const [token, setToken] = useState<string | null>(urlToken);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (member) return;
     if (urlToken) {
       setToken(urlToken);
       setFailed(false);
@@ -221,7 +223,19 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [workspaceId, urlToken, router, attempt]);
+  }, [workspaceId, urlToken, member, router, attempt]);
+
+  if (member) {
+    return (
+      <WorkspaceProvider workspaceId={workspaceId} token="" bearerToken={member}>
+        <IdentityGate>
+          <LayoutProvider>
+            <Wrapper />
+          </LayoutProvider>
+        </IdentityGate>
+      </WorkspaceProvider>
+    );
+  }
 
   if (failed) {
     return (

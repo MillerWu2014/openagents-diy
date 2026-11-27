@@ -380,7 +380,7 @@ class TestProfile:
         assert team[0]["avatarUrl"] == "https://cdn.example.com/a.png"
         # Invite peek shows the custom name.
         inv = client.post(f"/v1/workspaces/{wid}/invites", json={"role": "member"}, headers=_auth("al")).json()["data"]
-        token = inv["url"].rsplit("/", 1)[-1]
+        token = inv["code"]
         assert client.get(f"/v1/invites/{token}").json()["data"]["invitedBy"] == "Ada L."
 
     def test_profile_validation(self, client, monkeypatch):
@@ -459,8 +459,8 @@ class TestInvites:
         assert inv["status"] == "pending"
         assert inv["email"] == "bob@x.com"
         assert inv["emailSent"] is False  # no RESEND_API_KEY in tests
-        assert "/invite/" in inv["url"]
-        token = inv["url"].rsplit("/", 1)[-1]
+        assert inv["url"].startswith("openagents://join?") and inv["code"]
+        token = inv["code"]
 
         # Public peek — no auth, masked email, no workspace credentials leaked.
         peek = client.get(f"/v1/invites/{token}")
@@ -495,7 +495,7 @@ class TestInvites:
             f"/v1/workspaces/{wid}/invites", json={"role": "viewer"}, headers=_auth("al"),
         ).json()["data"]
         assert inv["email"] is None
-        token = inv["url"].rsplit("/", 1)[-1]
+        token = inv["code"]
 
         assert client.post(f"/v1/invites/{token}/accept", headers=_auth("bob")).status_code == 200
         assert client.post(f"/v1/invites/{token}/accept", headers=_auth("cy")).status_code == 200
@@ -513,7 +513,7 @@ class TestInvites:
         inv = client.post(
             f"/v1/workspaces/{wid}/invites", json={"email": "bob@x.com", "role": "viewer"}, headers=_auth("al"),
         ).json()["data"]
-        token = inv["url"].rsplit("/", 1)[-1]
+        token = inv["code"]
         r = client.post(f"/v1/invites/{token}/accept", headers=_auth("bob"))
         assert r.status_code == 200
         assert r.json()["data"]["role"] == "admin"
@@ -524,7 +524,7 @@ class TestInvites:
         inv = client.post(
             f"/v1/workspaces/{wid}/invites", json={"role": "member"}, headers=_auth("al"),
         ).json()["data"]
-        token = inv["url"].rsplit("/", 1)[-1]
+        token = inv["code"]
         data = client.get(f"/v1/invites/{token}").json()["data"]
         assert data["invitedBy"] == "raphael"
         assert "raphael@uaca.com" not in str(data)

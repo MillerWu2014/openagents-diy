@@ -34,6 +34,8 @@ export interface TeamInvite {
   email: string | null;
   role: WorkspaceRole;
   url: string;
+  /** The invite code inside `url`. Present for a local project invite. */
+  code?: string;
   status: 'pending' | 'accepted' | 'expired' | 'revoked';
   createdBy: string | null;
   createdAt: string | null;

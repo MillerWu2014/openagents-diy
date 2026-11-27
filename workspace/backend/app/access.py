@@ -171,6 +171,10 @@ def resolve_current_user(db: Session, authorization: Optional[str]) -> Optional[
     bearer = extract_bearer(authorization)
     if not bearer:
         return None
+    from app.services.local_members import user_for_token
+    member = user_for_token(db, bearer)
+    if member is not None:
+        return member
     claims = verify_identity_claims(bearer)
     if not claims:
         return None
@@ -352,6 +356,13 @@ def resolve_user_role(db: Session, workspace: Workspace, authorization: Optional
     """
     bearer = extract_bearer(authorization)
     if not bearer:
+        return None
+    from app.services.local_members import role_for_token, token_known
+    member_role = role_for_token(db, str(workspace.id), bearer)
+    if member_role:
+        return member_role
+    # A credential for a different project must not fall through to identity.
+    if token_known(db, bearer):
         return None
     claims = verify_identity_claims(bearer)
     if not claims:

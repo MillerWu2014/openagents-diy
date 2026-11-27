@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import naming
 from app.config import config
 from app.database import get_db
+from app.services.local_members import project_join_url
 from app.models import (
     Channel,
     ChannelMember,
@@ -2710,7 +2711,8 @@ def _invite_row(inv: WorkspaceInvite) -> dict:
         "inviteId": inv.id,
         "email": inv.email,
         "role": inv.role,
-        "url": f"{config.FRONTEND_BASE_URL}/invite/{inv.token}",
+        "url": project_join_url(inv.token),
+        "code": inv.token,
         "status": _invite_status(inv),
         "createdBy": inv.created_by,
         "createdAt": inv.created_at.isoformat() if inv.created_at else None,
@@ -2776,7 +2778,7 @@ def create_invite(
             to=email,
             workspace_name=workspace.name,
             role=body.role,
-            invite_url=f"{config.FRONTEND_BASE_URL}/invite/{invite.token}",
+            invite_url=project_join_url(invite.token),
             invited_by=inviter_name,
         )
 

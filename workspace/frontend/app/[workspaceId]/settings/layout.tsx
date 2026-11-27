@@ -46,12 +46,16 @@ function SettingsShell({ workspaceId, children }: { workspaceId: string; childre
   const { user, idToken, loading: authLoading, isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
 
   const urlToken = searchParams.get('token');
-  const query = urlToken ? `?token=${encodeURIComponent(urlToken)}` : '';
+  const member = searchParams.get('member');
+  const query = member
+    ? `?member=${encodeURIComponent(member)}`
+    : urlToken ? `?token=${encodeURIComponent(urlToken)}` : '';
 
   // ── Credential resolution: ?token= → oa_workspace cookie → account lookup ──
   // null = still resolving; '' = no workspace token (bearer-only or anonymous).
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => {
+    if (member) { setToken(''); return; }
     if (urlToken) { setToken(urlToken); return; }
     const fromCookie = readCookieToken(workspaceId);
     if (fromCookie) { setToken(fromCookie); return; }
@@ -69,10 +73,10 @@ function SettingsShell({ workspaceId, children }: { workspaceId: string; childre
       return () => { cancelled = true; };
     }
     setToken('');
-  }, [urlToken, workspaceId, idToken, authLoading]);
+  }, [urlToken, member, workspaceId, idToken, authLoading]);
 
   // ── Load workspace + caller role once credentials are settled ──
-  const credentialKey = `${workspaceId}:${idToken || ''}:${token ?? ''}`;
+  const credentialKey = `${workspaceId}:${member || idToken || ''}:${token ?? ''}`;
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [me, setMe] = useState<WorkspaceMe | null>(null);
@@ -80,7 +84,7 @@ function SettingsShell({ workspaceId, children }: { workspaceId: string; childre
 
   useEffect(() => {
     if (token === null || authLoading || (isOpenAgentsDomain && (!user || !idToken))) return;
-    workspaceApi.configure(workspaceId, token, idToken || undefined);
+    workspaceApi.configure(workspaceId, token, member || idToken || undefined);
     let cancelled = false;
     Promise.all([workspaceApi.getWorkspace(), workspaceApi.getMe()])
       .then(([ws, meData]) => {
@@ -96,7 +100,7 @@ function SettingsShell({ workspaceId, children }: { workspaceId: string; childre
         setError(msg.includes('API 401') || msg.includes('API 403') ? 'denied' : 'load');
       });
     return () => { cancelled = true; };
-  }, [token, workspaceId, idToken, authLoading, isOpenAgentsDomain, user, credentialKey]);
+  }, [token, member, workspaceId, idToken, authLoading, isOpenAgentsDomain, user, credentialKey]);
 
   const refreshWorkspace = useCallback(async () => {
     setWorkspace(await workspaceApi.getWorkspace());

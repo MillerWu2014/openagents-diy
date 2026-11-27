@@ -547,6 +547,11 @@ app.add_middleware(
 # Level 6 is the standard tradeoff between CPU cost and ratio.
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
+# Outermost: another computer may only peek or accept an invite, or call the
+# project with the member credential that accept returned. Loopback is unchanged.
+from app.lan_guard import LanGuard
+app.add_middleware(LanGuard)
+
 
 class NoTransformCompressionHeadersMiddleware:
     """Tell intermediate CDNs (Railway's Fastly layer) not to decompress

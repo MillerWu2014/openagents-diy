@@ -8,7 +8,7 @@ import {
 } from "../../shared/appearance-bridge"
 
 import { openExternalSafely } from "../web-security"
-import { WorkspaceHost, type ViewBounds } from "../workspace-host"
+import { WorkspaceHost, joinedProject, type ViewBounds } from "../workspace-host"
 import { popupWorkspaceTabContextMenu, popupWorkspaceTabMenu } from "../workspace-tab-menu"
 import { AccountManager, type AccountWorkspace } from "./account"
 import { webBase } from "./endpoints"
@@ -156,6 +156,7 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
       sessionId?: string | null,
       title?: string | null,
       importAgent?: string | null,
+      joined?: { apiUrl?: unknown; memberToken?: unknown } | null,
     ) => {
       const request = ++viewRequest
       // Renew before the page reads the session: the preload plants whatever
@@ -168,10 +169,15 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
       // Switching to local tools or signing out during refresh cancels this
       // request, so a delayed result cannot put a native view over that page.
       if (request !== viewRequest) return
-      host.show(target === null ? null : String(target || ""), bounds, token ?? null,
-        typeof sessionId === "string" && sessionId.length <= 200 ? sessionId : null,
-        typeof title === "string" && title ? title.slice(0, 200) : null,
-        typeof importAgent === "string" && importAgent.length <= 200 ? importAgent : null)
+      const remote = joined && typeof joined === "object"
+        ? joinedProject({ apiUrl: String(joined.apiUrl ?? ""), memberToken: String(joined.memberToken ?? "") })
+        : null
+      const targetId = target === null ? null : String(target || "")
+      const thread = typeof sessionId === "string" && sessionId.length <= 200 ? sessionId : null
+      const tabTitle = typeof title === "string" && title ? title.slice(0, 200) : null
+      const importing = typeof importAgent === "string" && importAgent.length <= 200 ? importAgent : null
+      if (remote) host.show(targetId, bounds, token ?? null, thread, tabTitle, importing, remote)
+      else host.show(targetId, bounds, token ?? null, thread, tabTitle, importing)
     },
   )
   ipcMain.handle("workspace-view:set-bounds", (_e, bounds: ViewBounds) =>
@@ -323,7 +329,7 @@ export function registerAccountIpc(deps: AccountIpcDeps): AccountManager {
     const { theme, language } = deps.appearance()
     event.returnValue = {
       session: host.currentSession(),
-      apiUrl: deps.endpoint(),
+      apiUrl: host.apiUrlFor(event.sender) || deps.endpoint(),
       webUrl: webBase(deps.endpoint()),
       theme,
       locale: toWorkspaceLocale(language),

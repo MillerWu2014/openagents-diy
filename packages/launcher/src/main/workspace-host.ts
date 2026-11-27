@@ -52,6 +52,25 @@ export { LAUNCHER_UA_TAG } from "./workspace-view-factory"
  * renderer's own DOM, with only the workspace pages themselves living out here.
  */
 
+/** A project joined on another computer. The member credential is not the project token. */
+export interface JoinedProject {
+  apiUrl: string
+  memberToken: string
+}
+
+/** Keep a joined address to http(s) with no path, user, or extra token. */
+export function joinedProject(value: JoinedProject | null | undefined): JoinedProject | null {
+  if (!value || typeof value.apiUrl !== "string" || typeof value.memberToken !== "string") return null
+  const memberToken = value.memberToken.trim()
+  if (!memberToken || memberToken.length > 200) return null
+  let url: URL
+  try { url = new URL(value.apiUrl) } catch { return null }
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return null
+  if (url.pathname !== "/" && url.pathname !== "") return null
+  if (url.search || url.hash) return null
+  return { apiUrl: url.origin, memberToken }
+}
+
 export interface ViewBounds {
   x: number
   y: number
@@ -104,6 +123,10 @@ interface ViewEntry {
   named: boolean
   /** The device token it was opened with. Stays in main, never in a snapshot. */
   token: string | null
+  /** Set when the page talks to another computer's project, not this one. */
+  apiUrl?: string
+  /** A member of someone else's project. Its agents stay on that computer. */
+  remote?: boolean
   /** What a reload, a retry or a stale view loads. */
   baseUrl: string
   state: WorkspaceTabState
@@ -243,6 +266,7 @@ export class WorkspaceHost implements BundlePages {
     sessionId?: string | null,
     title?: string | null,
     importAgent?: string | null,
+    joined?: JoinedProject | null,
   ): void {
     const window = this._deps.getWindow()
     if (!window) return
@@ -259,7 +283,9 @@ export class WorkspaceHost implements BundlePages {
       throw new Error(WORKSPACE_BUNDLE_MISSING)
     }
     this._bounds = bounds
-    if (target) this._active = this._openTab(target, token ?? null, sessionId ?? null, title ?? null, importAgent ?? null)
+    const remote = joinedProject(joined)
+    if (target && remote) this._active = this._openRemote(target, remote, title ?? null)
+    else if (target) this._active = this._openTab(target, token ?? null, sessionId ?? null, title ?? null, importAgent ?? null)
     else if (!this._active) this._active = this._ensureHome()
     this._visible = true
     this._attachActive()
@@ -520,10 +546,45 @@ export class WorkspaceHost implements BundlePages {
     this._deps.onProjectShown?.(slug)
   }
 
+  /** The address this page should call. Empty means the computer's own project API. */
+  apiUrlFor(contents: Electron.WebContents): string | undefined {
+    return this._entryFor(contents)?.apiUrl
+  }
+
   /** The open project changed, so its agents should be the ones listening. */
   private _follow(entry: ViewEntry | null): void {
+    // Someone else's project. Moving this computer's agents there would point
+    // them at a folder and a network that are not here.
+    if (entry?.remote) return
     const slug = entry && entry !== this._home ? entry.slug : null
     if (slug) this.followSlug(slug)
+  }
+
+  private _openRemote(target: string, joined: JoinedProject, title: string | null): ViewEntry {
+    const origin = new URL(joined.apiUrl).origin
+    const url = workspaceBundleUrl(
+      `/${encodeURIComponent(target)}?${new URLSearchParams({ member: joined.memberToken })}`,
+    )
+    const existing = findTab(this._tabs, target, origin)
+    if (existing) {
+      existing.apiUrl = joined.apiUrl
+      existing.remote = true
+      existing.baseUrl = url
+      if (title && !existing.named) existing.title = title
+      this._load(existing, url)
+      return existing
+    }
+    const entry = this._createEntry(`tab-${this._nextTab++}`, url)
+    entry.origin = origin
+    entry.apiUrl = joined.apiUrl
+    entry.remote = true
+    entry.aliases.add(target)
+    entry.title = title || target
+    entry.slug = target
+    entry.token = null
+    this._tabs.push(entry)
+    this._load(entry, url)
+    return entry
   }
 
   private _origin(): string {

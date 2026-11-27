@@ -2,22 +2,28 @@
 """Public invitation endpoints — the invitee's side of workspace invites.
 
 GET  /v1/invites/{token}         Peek at an invite (workspace name, role, status)
-POST /v1/invites/{token}/accept  Join the workspace (requires a signed-in identity)
+POST /v1/invites/{token}/accept  Join the workspace
 
 The invite token is the only secret involved; the workspace machine token is
-never exposed here. Accepting requires a verified identity bearer — for
-email-bound invites the signed-in email must match the invited address.
+never exposed here. A signed-in identity can accept. On this computer an open
+invite can also be accepted with a display name, which returns a member
+credential for that one project. Email-bound invites still require the
+matching signed-in address.
 Invites are created/managed by owners/admins in app/routers/workspaces.py.
 """
 
 import logging
+import secrets
 from datetime import datetime, timezone
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Body, Depends, Header
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.access import ROLE_RANK, resolve_current_user
+from app.services.local_members import clean_display_name, issue as issue_member_token
 from app.database import get_db
 from app.models import (
     Channel,
@@ -33,6 +39,11 @@ from app.response import ResponseCode, json_response, success_response
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/invites", tags=["Invites"])
+
+
+class AcceptInviteBody(BaseModel):
+    display_name: Optional[str] = None
+    displayName: Optional[str] = None
 
 
 def _mask_email(email: str) -> str:
@@ -194,16 +205,17 @@ def get_invite(token: str, db: Session = Depends(get_db)):
 @router.post("/{token}/accept")
 def accept_invite(
     token: str,
+    body: Optional[AcceptInviteBody] = Body(default=None),
     db: Session = Depends(get_db),
-    authorization: str = Header(None),
+    authorization: Optional[str] = Header(None),
 ):
-    """Join the invite's workspace as the signed-in user.
+    """Join the invite's workspace.
 
     Email-bound invites require the signed-in email to match and are consumed
-    on first accept; open links stay valid until expiry/revocation. An
-    existing higher role is never downgraded. Returns the workspace slug so
-    the frontend can land the new member in the workspace (bearer access —
-    no token in the URL)."""
+    on first accept; a signed-in open link stays valid until expiry. An open
+    link accepted with a display name is consumed and returns a member
+    credential for this project only — never the project token. An existing
+    higher role is never downgraded."""
     invite, workspace = _load(db, token)
     if invite is None or workspace is None or workspace.status == "deleted":
         return json_response(ResponseCode.NOT_FOUND, "Invite not found")
@@ -212,9 +224,22 @@ def accept_invite(
     if status != "pending":
         return json_response(ResponseCode.BAD_REQUEST, f"This invite is {status}")
 
+    named = clean_display_name(
+        (body.display_name or body.displayName) if body is not None else None
+    )
     user = resolve_current_user(db, authorization)
+    local_join = False
     if user is None:
-        return json_response(ResponseCode.UNAUTHORIZED, "Sign in to accept this invite")
+        # No name, or an invite addressed to an email: the signed-in path.
+        if invite.email or named is None:
+            return json_response(ResponseCode.UNAUTHORIZED, "Sign in to accept this invite")
+        local_join = True
+        user = User(
+            email=f"m-{secrets.token_hex(8)}@members.local",
+            display_name=named,
+        )
+        db.add(user)
+        db.flush()
 
     if invite.email and user.email != invite.email:
         return json_response(
@@ -243,6 +268,13 @@ def accept_invite(
 
     invite.accepted_at = datetime.now(timezone.utc)
     invite.accepted_by = user.email
+    # A named join is one person. Binding the invite to them consumes it.
+    if local_join:
+        invite.email = user.email
+    member_token = (
+        issue_member_token(db, str(workspace.id), str(user.id), membership.role, user.display_name or "")
+        if local_join else None
+    )
     db.commit()
 
     logger.info(
@@ -250,7 +282,7 @@ def accept_invite(
         invite.id, user.email, workspace.slug, membership.role,
         invite.target_kind, invite.target_id,
     )
-    return success_response({
+    payload = {
         "workspaceId": workspace.id,
         "slug": workspace.slug,
         "workspaceName": workspace.name,
@@ -258,4 +290,7 @@ def accept_invite(
         "target_kind": invite.target_kind,
         "target_id": invite.target_id,
         "redirect": redirect,
-    })
+    }
+    if member_token:
+        payload["memberToken"] = member_token
+    return success_response(payload)

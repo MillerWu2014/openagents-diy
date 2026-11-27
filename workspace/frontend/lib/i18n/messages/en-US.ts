@@ -1599,10 +1599,11 @@ export const messages = {
     invitePlaceholder: 'teammate@company.com',
     inviteSend: 'Send invite',
     inviteHint:
-      'They get an email with an invitation link. After signing in with this address they join with the selected role.',
+      'Send the link to another computer on this network that has this app. They enter a name and join this project with the selected role.',
     createInviteLink: 'Create invite link',
     inviteLinkHint:
-      'A shareable link anyone can use to join with the selected role. It expires automatically and can be revoked — it never contains the project token.',
+      'The link carries only an invite code, never the project token. The other computer has to be on this network. The link expires and can be revoked.',
+    inviteCode: 'Invite code {code}',
     linkCopied: 'Invite link copied',
     linkCreated: 'Invite link created',
     inviteEmailSent: 'Invitation email sent to {email}',
@@ -1754,7 +1755,8 @@ export const messages = {
     invitedAs: "You've been invited to join as a {role}.",
     boundTo: 'This invitation is for {email}',
     signInToAccept: 'Sign in to accept',
-    signInHint: 'Sign in to OpenAgents to join this project.',
+    signInHint: 'Enter your name to join. There is no sign-in.',
+    nameLabel: 'Your name',
     join: 'Join {project}',
     signedInAs: 'Signed in as {email}.',
     switchAccount: 'Use a different account',

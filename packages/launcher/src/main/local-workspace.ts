@@ -2,7 +2,8 @@
  * The desktop app opens one local project. The packaged UI asks
  * `/v1/local/project` on whatever API it was given; the hosted API answers
  * 404 and the page stays on the loading splash. This starts that API on
- * loopback with a SQLite file in the app's own data directory.
+ * this computer, with a SQLite file in the app's own data directory. Another
+ * computer can reach only an invite and, after joining, that one project.
  */
 import { execFileSync, spawn, type ChildProcess } from "child_process"
 import fs from "fs"
@@ -122,7 +123,7 @@ export async function ensureLocalWorkspace(): Promise<boolean> {
   const db = path.join(app.getPath("userData"), "local-workspace.sqlite")
   child = spawn(
     python,
-    ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(LOCAL_WORKSPACE_PORT)],
+    ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", String(LOCAL_WORKSPACE_PORT)],
     {
       cwd: dir,
       env: {
@@ -130,6 +131,11 @@ export async function ensureLocalWorkspace(): Promise<boolean> {
         DATABASE_URL: sqliteUrl(db),
         BACKGROUND_JOBS_ENABLED: "false",
         CORS_ORIGINS: "*",
+        // The process listens on the network so an invite can be redeemed.
+        // Everything except that invite, and a member of the project, stays
+        // on this computer. See app/lan_guard.py.
+        LOCAL_LAN_GUARD: "1",
+        LOCAL_WORKSPACE_PORT: String(LOCAL_WORKSPACE_PORT),
       },
       stdio: ["ignore", "ignore", "pipe"],
     },

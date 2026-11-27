@@ -28,6 +28,8 @@ export interface WorkspaceTarget {
    * member of still opens — exactly as a shared link would.
    */
   token: string | null
+  /** Another computer's project. The page uses the member credential, not a project token. */
+  remote?: { apiUrl: string; memberToken: string } | null
 }
 
 interface AccountState {

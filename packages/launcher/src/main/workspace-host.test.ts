@@ -269,6 +269,23 @@ describe('workspace tabs', () => {
     host.openRoute(contents(1) as never, '/')
     expect(last(host).active).toBe('home')
   })
+  it('opens a joined project on that computer and does not move local agents', () => {
+    const onProjectShown = vi.fn()
+    const win = { webContents:{ on:vi.fn() }, contentView:{ addChildView:vi.fn(), removeChildView:vi.fn() } }
+    const host = new WorkspaceHost({
+      getWindow:() => win as never, endpoint:() => 'http://127.0.0.1:18765', session:() => null,
+      onExternalLogin:vi.fn(), onProjectShown,
+    })
+    host.show('blog', bounds, null, null, 'Blog', null, {
+      apiUrl: 'http://192.168.1.5:18765',
+      memberToken: 'member-secret',
+    })
+    expect(contents(0).loadURL).toHaveBeenCalledWith(
+      'openagents://workspace/index.html#/blog?member=member-secret',
+    )
+    expect(onProjectShown).not.toHaveBeenCalled()
+    expect(host.apiUrlFor(contents(0) as never)).toBe('http://192.168.1.5:18765')
+  })
   it('follows the project the open page names, and again when that tab comes forward', () => {
     const onProjectShown = vi.fn()
     const win = { webContents:{ on:vi.fn() }, contentView:{ addChildView:vi.fn(), removeChildView:vi.fn() } }

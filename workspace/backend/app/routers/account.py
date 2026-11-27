@@ -21,7 +21,7 @@ collaborators' data; their `creator_email` is left intact.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
@@ -183,13 +183,40 @@ def _profile_row(user) -> dict:
     }
 
 
+def _profile_user(db: Session, authorization: Optional[str], request: Request, workspace_token: Optional[str]):
+    """The signed-in person, or the person on this computer when the call
+    carries this project's token and no identity of its own.
+
+    A bearer that does not resolve stays anonymous. The project token must
+    not promote it to the local owner.
+    """
+    user = resolve_current_user(db, authorization)
+    if user is not None or _extract_bearer(authorization) or not workspace_token:
+        return user
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "testclient") and not host.startswith("127."):
+        return None
+    workspace = db.execute(
+        select(Workspace).where(
+            Workspace.password_hash == workspace_token,
+            Workspace.status != "deleted",
+        ).limit(1)
+    ).scalar_one_or_none()
+    if workspace is None:
+        return None
+    from app.routers.local_project import _user
+    return _user(db)
+
+
 @router.get("/account/profile")
 def get_profile(
+    request: Request,
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None),
+    x_workspace_token: Optional[str] = Header(None),
 ):
     """The signed-in user's profile (name + avatar), shared across workspaces."""
-    user = resolve_current_user(db, authorization)
+    user = _profile_user(db, authorization, request, x_workspace_token)
     if not user:
         return json_response(ResponseCode.UNAUTHORIZED, "Invalid identity token")
     db.commit()  # persist the lazily created/refreshed User row
@@ -199,12 +226,14 @@ def get_profile(
 @router.patch("/account/profile")
 def update_profile(
     body: ProfileUpdateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None),
+    x_workspace_token: Optional[str] = Header(None),
 ):
     """Update display name and/or avatar. Omitted fields are left untouched;
     an empty-string avatar_url clears the picture."""
-    user = resolve_current_user(db, authorization)
+    user = _profile_user(db, authorization, request, x_workspace_token)
     if not user:
         return json_response(ResponseCode.UNAUTHORIZED, "Invalid identity token")
 

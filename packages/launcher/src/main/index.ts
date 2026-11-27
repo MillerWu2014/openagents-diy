@@ -101,6 +101,8 @@ import {
 import { createWorkspaceBundleUpdater, type WorkspaceBundleUpdater } from "./bundle-ota"
 import { normalizeWorkspaceEndpoint } from "./agents/env-normalize"
 import { ensureLocalWorkspace, localWorkspaceUrl, servesLocalWorkspace, stopLocalWorkspace } from "./local-workspace"
+import { parseJoinUrl } from "../shared/join-link"
+import { redeemInvite } from "./join-remote"
 import { attachRendererLogging, rendererLogPath } from "./renderer-log"
 import { crashLoopGuard, startStallWatchdog } from "./responsiveness"
 import {
@@ -776,19 +778,17 @@ function applyStartOnBoot(): void {
 // session the updater will use — setting the proxy on it is the only way the
 // in-app proxy reaches update downloads.
 function createTray(): void {
-  // macOS: a white glyph, inset to 18pt. The menu-bar canvas is 22pt and AppKit
-  // draws the image at that size, while other menu-bar extras keep their glyph
-  // around 18pt inside it — full-bleed 22pt art reads as oversized next to
-  // them. Electron auto-loads the matching @2x file as the Retina rep.
+  // macOS: a black template glyph. The menu bar follows the desktop behind it,
+  // so the same icon has to be dark on a light bar and light on a dark one.
+  // AppKit does that only for a template image; a fixed white PNG stayed white
+  // on both. Electron auto-loads the matching @2x file as the Retina rep.
   //
   // Windows: the app icon, not a glyph. The notification area follows the
   // "Windows mode" setting independently of the app's own theme, so it can be
   // light or dark and a monochrome glyph is invisible against one of them —
-  // a white glyph on a light taskbar was the bug. The 1.0 mark cannot solve it
-  // in colour either: its top-right arc and bottom-right dot are black and
-  // vanish on a dark taskbar. The opaque tile carries its own background and
-  // so reads on both, and matches what Windows already shows for this app on
-  // the taskbar and in the Start menu.
+  // a white glyph on a light taskbar was the bug. The opaque tile carries its
+  // own background and so reads on both, and matches what Windows already
+  // shows for this app on the taskbar and in the Start menu.
   //
   // Linux: panels are conventionally dark, so the white glyph stands.
   //
@@ -809,6 +809,7 @@ function createTray(): void {
     path.join(assetsDir, trayIconFile),
   )
   if (!trayIcon || trayIcon.isEmpty()) trayIcon = createPlaceholderIcon()
+  else if (process.platform === "darwin") trayIcon.setTemplateImage(true)
 
   tray = new Tray(trayIcon)
   tray.setToolTip(t("trayTooltip"))
@@ -2686,6 +2687,19 @@ function setupIPC(): void {
   // Account + the embedded workspace view. Registered last and kept in its own
   // module: signing in gates the workspace half of the app. Earlier handlers
   // read the manager when invoked, after setup has finished.
+  ipcMain.handle("project:join-remote", async (_e, raw: unknown) => {
+    const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {}
+    const pasted = typeof input.link === "string" ? parseJoinUrl(input.link) : null
+    const host = pasted?.host || (typeof input.host === "string" ? input.host.trim() : "")
+    const port = pasted?.port || Number(input.port || 18765)
+    const code = pasted?.code || (typeof input.code === "string" ? input.code.trim() : "")
+    const target = parseJoinUrl(
+      `openagents://join?${new URLSearchParams({ host, port: String(port), code })}`,
+    )
+    if (!target) throw new Error("join:address")
+    return redeemInvite(target, typeof input.displayName === "string" ? input.displayName : "")
+  })
+
   accountManager = registerAccountIpc({
     endpoint: () =>
       normalizeWorkspaceEndpoint(store.get("workspaceEndpoint")) || localWorkspaceUrl(),
@@ -2743,6 +2757,38 @@ if (!gotLock) {
     // absolutely no response: the app is running and looks unopenable.
     createWindow()
   })
+}
+
+const pendingJoins: Array<{ host: string; port: number; code: string }> = []
+
+function rememberJoinUrl(raw: string): void {
+  const target = parseJoinUrl(raw)
+  if (!target) return
+  const win = mainWindow
+  if (!win || win.isDestroyed()) {
+    pendingJoins.push(target)
+    return
+  }
+  win.webContents.send("project:join-request", target)
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+ipcMain.handle("project:pending-join", () => pendingJoins.shift() ?? null)
+
+app.on("open-url", (event, url) => {
+  event.preventDefault()
+  rememberJoinUrl(url)
+})
+try {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) app.setAsDefaultProtocolClient("openagents", process.execPath, [process.argv[1]])
+  } else {
+    app.setAsDefaultProtocolClient("openagents")
+  }
+} catch (err) {
+  slog(`[join] could not register the openagents link: ${(err as Error).message}`)
 }
 
 app.whenReady().then(async () => {
