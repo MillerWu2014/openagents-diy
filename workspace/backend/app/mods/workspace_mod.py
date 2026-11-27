@@ -1046,15 +1046,15 @@ def _fallback_targets(event, channel, mentions: List[str], online_names: set = N
     participant → any participant. When ``online_names`` is provided, an online
     participant is chosen over an offline one so messages aren't stranded on a
     dead agent. An explicit @mention is always honored as-is (the user chose it).
+
+    An agent's reply wakes nobody here: it hands off only by a leading @mention
+    or the handoff tool (_explicit_agent_targets), which callers check first.
     """
+    if (event.source or "").startswith("openagents:"):
+        return []
     if mentions:
         return [mentions[0]]
     if channel.master_agent:
-        if event.source.startswith("openagents:"):
-            sender = event.source[len("openagents:"):]
-            # Master's own messages: no self-trigger
-            if sender == channel.master_agent:
-                return []
         return [channel.master_agent]
     # No master — prefer an online participant, else the first participant.
     participants = [p.agent_name for p in (channel.participants or [])]
@@ -1401,8 +1401,11 @@ async def _conversation_targets(event, channel, db, workspace, known_agents):
     if named and named in candidates:
         event.metadata["routing_decision"] = "assign"
         return [named]
-    from app.config import config
-    if not config.ROUTER_LLM_ENABLED:
+    if not _router_configured():
+        # Without a model the thread's lead agent takes unaddressed messages.
+        if channel.master_agent in candidates:
+            event.metadata["routing_decision"] = "assign"
+            return [channel.master_agent]
         event.metadata["router_unavailable"] = True
         return _routing_choice(event, candidates)
     targets = await _route_with_llm(
@@ -1422,6 +1425,13 @@ def _get_router_api_key() -> str:
     """Resolve the API key: ROUTER_LLM_API_KEY takes priority, then ANTHROPIC_API_KEY."""
     from app.config import config
     return config.ROUTER_LLM_API_KEY or config.ANTHROPIC_API_KEY
+
+
+def _router_configured() -> bool:
+    """A routing model can be called, as _route_with_llm checks it."""
+    from app.config import config
+    dedicated = bool(config.MESSAGE_ROUTER_MODEL and config.MESSAGE_ROUTER_API_KEY)
+    return config.ROUTER_LLM_ENABLED and (dedicated or bool(_get_router_api_key()))
 
 
 def _get_router_model() -> str:
@@ -2517,7 +2527,7 @@ async def _handle_message_posted(event: Event, ctx: PipelineContext) -> Optional
           and not channel.service_id
           and not channel.name.startswith(('task:', 'routine:', 'routines:', 'dm:', 'issue-work-'))):
         from app.services.completion_routing import completion_targets
-        targets = await completion_targets(db, workspace, channel, event)
+        targets = explicit if explicit is not None else await completion_targets(db, workspace, channel, event)
     elif conversation_targets is not None:
         targets = conversation_targets
     elif event.source.startswith("human:") and not mentions and _addresses_people_only(event):
