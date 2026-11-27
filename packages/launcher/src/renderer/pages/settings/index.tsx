@@ -17,6 +17,7 @@ import { GeneralSection } from "./sections/general-section"
 import { AppearanceSection } from "./sections/appearance-section"
 import { NotificationsSection } from "./sections/notifications-section"
 import { NetworkSection } from "./sections/network-section"
+import { RouterSection } from "./sections/router-section"
 import { DataSection } from "./sections/data-section"
 import { LanguageSection } from "./sections/language-section"
 import { UpdatesSection } from "./sections/updates-section"
@@ -131,6 +132,7 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
                   persist={persist}
                 />
               )}
+              {section === "router" && <RouterSection showToast={showToast} />}
               {section === "data" && (
                 <DataSection
                   paths={paths}

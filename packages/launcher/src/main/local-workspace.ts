@@ -33,6 +33,41 @@ export function stopLocalWorkspace(): void {
   proc.kill()
 }
 
+/** Settings → Router model, as the backend reads it (app/config.py). */
+export function routerEnv(value: unknown): Record<string, string> {
+  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>
+  const text = (k: string): string => (typeof v[k] === "string" ? (v[k] as string).trim() : "")
+  const baseUrl = text("baseUrl")
+  const model = text("model")
+  if (!baseUrl || !model) return {}
+  return {
+    ROUTER_LLM_ENABLED: "true",
+    ROUTER_LLM_PROVIDER: "openai",
+    ROUTER_LLM_BASE_URL: baseUrl,
+    // Ollama and LM Studio take no key, but the backend routes only with one.
+    ROUTER_LLM_API_KEY: text("apiKey") || "no-key",
+    ROUTER_LLM_MODEL: model,
+    COMPLETION_ROUTING_ENABLED: "true",
+  }
+}
+
+/** False when this app did not start the running API, so it cannot restart it. */
+export async function restartLocalWorkspace(env: Record<string, string>): Promise<boolean> {
+  const proc = child
+  if (!proc) return false
+  child = null
+  await new Promise<void>((resolve) => {
+    // Open long polls can hold a graceful uvicorn shutdown indefinitely.
+    const force = setTimeout(() => proc.kill("SIGKILL"), 5_000)
+    proc.once("exit", () => {
+      clearTimeout(force)
+      resolve()
+    })
+    proc.kill()
+  })
+  return ensureLocalWorkspace(env)
+}
+
 function backendDir(): string | null {
   const candidates = [
     process.env.OPENAGENTS_WORKSPACE_BACKEND,
@@ -104,7 +139,7 @@ async function healthy(url: string): Promise<boolean> {
 }
 
 /** Start the loopback API if it is not already answering. */
-export async function ensureLocalWorkspace(): Promise<boolean> {
+export async function ensureLocalWorkspace(extraEnv: Record<string, string> = {}): Promise<boolean> {
   const url = localWorkspaceUrl()
   if (await healthy(url)) {
     slog(`[local-workspace] already up at ${url}`)
@@ -128,6 +163,7 @@ export async function ensureLocalWorkspace(): Promise<boolean> {
       cwd: dir,
       env: {
         ...process.env,
+        ...extraEnv,
         DATABASE_URL: sqliteUrl(db),
         BACKGROUND_JOBS_ENABLED: "false",
         CORS_ORIGINS: "*",

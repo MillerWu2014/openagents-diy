@@ -100,7 +100,14 @@ import {
 } from "./workspace-bundle"
 import { createWorkspaceBundleUpdater, type WorkspaceBundleUpdater } from "./bundle-ota"
 import { normalizeWorkspaceEndpoint } from "./agents/env-normalize"
-import { ensureLocalWorkspace, localWorkspaceUrl, servesLocalWorkspace, stopLocalWorkspace } from "./local-workspace"
+import {
+  ensureLocalWorkspace,
+  localWorkspaceUrl,
+  restartLocalWorkspace,
+  routerEnv,
+  servesLocalWorkspace,
+  stopLocalWorkspace,
+} from "./local-workspace"
 import { parseJoinUrl } from "../shared/join-link"
 import { redeemInvite } from "./join-remote"
 import { attachRendererLogging, rendererLogPath } from "./renderer-log"
@@ -1653,6 +1660,8 @@ function setupIPC(): void {
   ipcMain.handle("settings:get", (_e, key) => store.get(key))
   ipcMain.handle("settings:set", (_e, key, value) => {
     store.set(key, value)
+    // The backend reads the router from its environment at start.
+    if (key === "routerModel") return restartLocalWorkspace(routerEnv(value))
     if (key === "workspaceEndpoint" && agentManager) {
       agentManager.reloadCore()
     }
@@ -2126,8 +2135,13 @@ function setupIPC(): void {
   })
 
   ipcMain.handle("settings:get-all", () => store.get())
+  // The router key is a secret, and an exported settings file gets passed around.
+  const exportableSettings = (): Record<string, unknown> => {
+    const { routerModel: _secret, ...rest } = store.get() as Record<string, unknown>
+    return rest
+  }
   ipcMain.handle("settings:export", () => {
-    return JSON.stringify(store.get(), null, 2)
+    return JSON.stringify(exportableSettings(), null, 2)
   })
   // Writes through a native Save dialog so the user picks the destination and
   // a cancel is reported as such — the renderer used to trigger an <a download>
@@ -2146,7 +2160,7 @@ function setupIPC(): void {
     try {
       fs.writeFileSync(
         result.filePath,
-        JSON.stringify(store.get(), null, 2),
+        JSON.stringify(exportableSettings(), null, 2),
         "utf-8",
       )
       return { ok: true, path: result.filePath }
@@ -2798,7 +2812,7 @@ app.whenReady().then(async () => {
   // A saved local address is not a running server. The last launch wrote it
   // down, then quit and took the process with it.
   if (servesLocalWorkspace(configured)) {
-    const ready = await ensureLocalWorkspace()
+    const ready = await ensureLocalWorkspace(routerEnv(store.get("routerModel")))
     if (ready && !configured) store.set("workspaceEndpoint", localWorkspaceUrl())
   }
   // Which Workspace bundle to serve — a verified download newer than the one
