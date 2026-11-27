@@ -12,12 +12,18 @@ export function EdgeToggle({
   label,
   expanded,
   onClick,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
   className,
   style,
 }: {
   label: string;
   expanded: boolean;
   onClick: () => void;
+  onPointerDown?: React.PointerEventHandler<HTMLElement>;
+  onPointerMove?: React.PointerEventHandler<HTMLElement>;
+  onPointerUp?: React.PointerEventHandler<HTMLElement>;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -27,6 +33,9 @@ export function EdgeToggle({
       aria-label={label}
       aria-expanded={expanded}
       onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
       style={style}
       className={cn(
         'group/rail z-30 flex h-12 w-7 -translate-y-1/2 cursor-pointer items-center pl-2 outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring',

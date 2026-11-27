@@ -503,6 +503,7 @@ export const messages: Messages = {
     viewActions: '视图操作',
     expandSidebar: '展开侧边栏',
     collapseSidebar: '收起侧边栏',
+    resizeSidebar: '调整侧边栏宽度',
   },
 
   threadSettings: {

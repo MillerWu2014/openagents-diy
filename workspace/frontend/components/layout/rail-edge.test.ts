@@ -6,7 +6,15 @@ import { RailEdge } from './rail-edge';
 
 const state = vi.hoisted(() => ({ toggleRail: vi.fn() }));
 vi.mock('./layout-context', () => ({
-  useLayout: () => ({ isRailExpanded: true, toggleRail: state.toggleRail }),
+  useLayout: () => ({
+    isRailExpanded: true,
+    railExpandedWidth: 256,
+    toggleRail: state.toggleRail,
+    beginRailResize: vi.fn(),
+    resizeRail: vi.fn(),
+    endRailResize: vi.fn(),
+  }),
+  RAIL_WIDTH_COLLAPSED: 52,
 }));
 vi.mock('@/lib/i18n', () => ({ useT: () => (key: string) => key }));
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

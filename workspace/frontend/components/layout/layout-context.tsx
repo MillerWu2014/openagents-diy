@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   useOptimistic,
+  useRef,
   useState,
   useTransition
 } from 'react';
@@ -117,12 +118,37 @@ function writeRailPref(expanded: boolean) {
 }
 
 /**
- * The rail's two widths. Expanded is 13rem: a little narrower than shadcn's
- * default sidebar (16rem), which took close to a quarter of a 100% zoom page;
- * the Manage Agents button and the inbox envelope still fit side by side.
+ * The rail's widths. The expanded default matches the Computer sidebar, which
+ * is 16rem. Dragging stays between the minimum that still fits a project name
+ * and a cap that leaves the conversation room.
  */
 export const RAIL_WIDTH_COLLAPSED = 52;
-export const RAIL_WIDTH_EXPANDED = 208;
+export const RAIL_WIDTH_DEFAULT = 256;
+export const RAIL_WIDTH_MIN = 220;
+export const RAIL_WIDTH_MAX = 480;
+export const RAIL_WIDTH_EXPANDED = RAIL_WIDTH_DEFAULT;
+
+const RAIL_WIDTH_COOKIE = 'oa-rail-width';
+
+function readRailWidth(): number {
+  if (typeof document === 'undefined') return RAIL_WIDTH_DEFAULT;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${RAIL_WIDTH_COOKIE}=(\\d+)`));
+  const width = match ? Number(match[1]) : RAIL_WIDTH_DEFAULT;
+  if (!Number.isFinite(width)) return RAIL_WIDTH_DEFAULT;
+  return Math.max(RAIL_WIDTH_MIN, Math.min(RAIL_WIDTH_MAX, width));
+}
+
+function writeRailWidth(width: number) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${RAIL_WIDTH_COOKIE}=${width}; path=/; max-age=${LIST_PREFS_MAX_AGE}; samesite=lax`;
+}
+
+/** Where a drag from `start` by `delta` pixels leaves the rail. */
+export function nextRailDrag(start: number, delta: number): { expanded: boolean; width: number } {
+  const next = Math.round(start + delta);
+  if (next < RAIL_WIDTH_MIN) return { expanded: false, width: start >= RAIL_WIDTH_MIN ? start : RAIL_WIDTH_DEFAULT };
+  return { expanded: true, width: Math.min(RAIL_WIDTH_MAX, next) };
+}
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -200,6 +226,15 @@ interface LayoutState {
   hasListPanel: boolean;
   /** Whether the icon rail is widened to show its labels */
   isRailExpanded: boolean;
+  /** Width of the rail while it is expanded. Collapsed stays at the icon width. */
+  railExpandedWidth: number;
+  /** Live width while a drag is in progress. Null the rest of the time. */
+  railDragWidth: number | null;
+  railResizing: boolean;
+  beginRailResize: () => void;
+  /** `width` is the rail width the pointer is asking for, in pixels. */
+  resizeRail: (width: number) => void;
+  endRailResize: () => void;
   toggleRail: () => void;
   setRailExpanded: (expanded: boolean) => void;
   /** Show an artifact side-by-side with chat */
@@ -270,6 +305,13 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const splitBrowser = true;
   const handleSetSplitBrowser = (v: boolean) => { if (!v) setShowBrowserPreview(false); };
   const [isRailExpanded, setIsRailExpanded] = useState(false);
+  const [railExpandedWidth, setRailExpandedWidth] = useState(RAIL_WIDTH_DEFAULT);
+  const [railResizing, setRailResizing] = useState(false);
+  const [railDragWidth, setRailDragWidth] = useState<number | null>(null);
+  const railExpandedRef = useRef(isRailExpanded);
+  const railWidthRef = useRef(railExpandedWidth);
+  railExpandedRef.current = isRailExpanded;
+  railWidthRef.current = railExpandedWidth;
   const openArtifact = useCallback((artifact: ArtifactReference) => {
     if (artifact.kind === 'browser') threadView.update({ selectedBrowser: artifact, browserView: 'compact', browserWatchOnly: false });
     else threadView.update({ selectedArtifact: artifact, previewOpen: true });
@@ -283,6 +325,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setListPrefs(readListPrefs());
     setIsRailExpanded(readRailPref());
+    setRailExpandedWidth(readRailWidth());
   }, []);
 
   // Persist outside the state updater: React may run an updater more than once
@@ -294,6 +337,27 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleRail = () => setRailExpanded(!isRailExpanded);
+
+  const beginRailResize = () => setRailResizing(true);
+  const resizeRail = (width: number) => {
+    const shown = Math.max(RAIL_WIDTH_COLLAPSED, Math.min(RAIL_WIDTH_MAX, Math.round(width)));
+    setRailDragWidth(shown);
+    const result = nextRailDrag(width, 0);
+    if (!result.expanded) {
+      if (railExpandedRef.current) setRailExpanded(false);
+      return;
+    }
+    if (railWidthRef.current !== result.width) {
+      railWidthRef.current = result.width;
+      setRailExpandedWidth(result.width);
+    }
+    if (!railExpandedRef.current) setRailExpanded(true);
+  };
+  const endRailResize = () => {
+    setRailResizing(false);
+    setRailDragWidth(null);
+    writeRailWidth(railWidthRef.current);
+  };
 
   const isAgentPanelOpen = selectedAgentName !== null;
   const openMobileDetail = () => setMobilePane('detail');
@@ -434,6 +498,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       hasListPanel,
       selectedRoutineId, setSelectedRoutineId,
       isRailExpanded,
+      railExpandedWidth,
+      railDragWidth,
+      railResizing,
+      beginRailResize,
+      resizeRail,
+      endRailResize,
       toggleRail,
       setRailExpanded,
       splitBrowser,

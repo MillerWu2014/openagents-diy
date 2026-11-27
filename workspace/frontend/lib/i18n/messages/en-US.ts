@@ -511,6 +511,7 @@ export const messages = {
     viewActions: 'View actions',
     expandSidebar: 'Expand sidebar',
     collapseSidebar: 'Collapse sidebar',
+    resizeSidebar: 'Resize sidebar',
   },
 
   threadSettings: {
@@ -588,7 +589,7 @@ export const messages = {
     otherDevice: 'Another device',
     otherDeviceTypes: 'Laptop, desktop, or server',
     otherDeviceBody: 'Install OpenAgents on another computer or server, then enter a pairing code to connect it.',
-    "thisComputerTitle": "Connect a device to {project}, then add agents",
+    "thisComputerTitle": "Connect a device to {workspace}, then add agents",
     "thisComputer": "This computer",
     "appReady": "OpenAgents installed",
     "computerPermission": "Authorize this computer for this project. Project admins can manage its agents. You can disconnect it under This Computer.",

@@ -154,6 +154,24 @@ class TestHeartbeatAndList:
         assert len(listed) == 1
         assert listed[0]["deviceType"] == "laptop" and listed[0]["status"] == "online"
 
+    def test_project_token_sees_the_paired_computer(self, client):
+        ws = _make_workspace(client)
+        code = client.post(f"/v1/workspaces/{ws['workspaceId']}/pairing-codes", headers=_owner()).json()["data"]["code"]
+        mine = client.post("/v1/nodes/redeem", json={"code": code, "node_key": "this-mac"}).json()["data"]
+        client.post("/v1/nodes/heartbeat", json={"node_id": mine["nodeId"], "fs": {"home": "/Users/me"}}, headers=_tok(mine["token"]))
+        code2 = client.post(f"/v1/workspaces/{ws['workspaceId']}/pairing-codes", headers=_owner()).json()["data"]["code"]
+        other = client.post("/v1/nodes/redeem", json={"code": code2, "node_key": "other-mac"}).json()["data"]
+
+        # The project page signs with the workspace token, not a person's bearer
+        # and not the computer's own credential.
+        listed = client.get(f"/v1/nodes?network={ws['workspaceId']}", headers=_tok(ws["token"])).json()["data"]
+        assert {n["nodeId"] for n in listed} == {mine["nodeId"], other["nodeId"]}
+        assert next(n for n in listed if n["nodeId"] == mine["nodeId"])["fs"]["home"] == "/Users/me"
+
+        # The computer itself still only sees its own connection.
+        own = client.get(f"/v1/nodes?network={ws['workspaceId']}", headers=_tok(mine["token"])).json()["data"]
+        assert [n["nodeId"] for n in own] == [mine["nodeId"]]
+
     def test_delete_node(self, client):
         ws = _make_workspace(client)
         node_id = _connect_node(client, ws)

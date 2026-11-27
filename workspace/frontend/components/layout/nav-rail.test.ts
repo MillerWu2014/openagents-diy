@@ -28,7 +28,6 @@ vi.mock('@/components/ui/tooltip', () => {
 vi.mock('next/image', () => ({ default: () => null }));
 vi.mock('./sidebar-members', () => ({ SidebarMembers: () => null }));
 vi.mock('@/components/threads/desktop-notification-prompt', () => ({ DesktopNotificationPrompt: () => null }));
-vi.mock('./new-local-project', () => ({ NewLocalProject: () => null }));
 vi.mock('./project-switcher', () => ({ ProjectSwitcher: ({ name }: { name: string }) => name }));
 vi.mock('./search-menu', () => ({ SearchMenu: () => null }));
 vi.mock('./user-menu', () => ({ UserMenu: () => null }));

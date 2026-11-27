@@ -28,6 +28,8 @@ export function DesktopComputerStep({ host, workspaceId, workspaceName, onConnec
   // answers: its result belongs to the workspace it was asked for.
   const currentWorkspace = useRef(workspaceId);
   currentWorkspace.current = workspaceId;
+  const onConnectedRef = useRef(onConnected);
+  onConnectedRef.current = onConnected;
 
   useEffect(() => {
     mounted.current = true;
@@ -83,7 +85,7 @@ export function DesktopComputerStep({ host, workspaceId, workspaceName, onConnec
         const reported = !!node?.fs?.home || (!!node?.lastHeartbeatAt && node.lastHeartbeatAt !== firstHeartbeat);
         if (node?.status === 'online' && reported) {
           clearTimeout(timeout);
-          onConnected(computer.nodeId!);
+          onConnectedRef.current(computer.nodeId!);
           return;
         }
       } catch { /* A transient failure can recover on the next check. */ }
@@ -92,7 +94,7 @@ export function DesktopComputerStep({ host, workspaceId, workspaceName, onConnec
     };
     void check();
     return () => { cancelled = true; clearTimeout(timer); clearTimeout(timeout); };
-  }, [phase, computer?.nodeId, onConnected]);
+  }, [phase, computer?.nodeId]);
 
   const connect = useCallback(async () => {
     if (busy.current || !editable) return;

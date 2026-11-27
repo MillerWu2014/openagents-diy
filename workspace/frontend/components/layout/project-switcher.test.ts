@@ -7,17 +7,19 @@ import { ProjectSwitcher } from './project-switcher';
 const state = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('next/image', () => ({ default: () => null }));
+vi.mock('./new-local-project', () => ({ NewLocalProject: () => null }));
 vi.mock('@/lib/i18n', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/components/ui/dropdown-menu', () => {
   const wrap = ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children);
-  const item = ({ children, onSelect }: { children?: React.ReactNode; onSelect?: () => void }) =>
-    React.createElement('button', { onClick: onSelect }, children);
+  const item = ({ children, onSelect, ...props }: { children?: React.ReactNode; onSelect?: () => void; 'data-current'?: string }) =>
+    React.createElement('button', { onClick: onSelect, 'data-current': props['data-current'] }, children);
   return {
     DropdownMenu: wrap,
     DropdownMenuContent: wrap,
     DropdownMenuLabel: wrap,
+    DropdownMenuSeparator: () => null,
     DropdownMenuTrigger: wrap,
-    DropdownMenuCheckboxItem: item,
+    DropdownMenuItem: item,
   };
 });
 vi.stubGlobal('React', React);
@@ -45,11 +47,14 @@ it('lists projects and opens the one that is not current', async () => {
   await act(async () => { await Promise.resolve(); });
   expect(document.body.textContent).toContain('blog');
   expect(document.body.textContent).toContain('机位分配');
-  expect(document.body.textContent).toContain('/tmp/stands');
+  expect(document.body.textContent).toContain('…/stands');
+  expect(document.body.textContent).not.toContain('/tmp/stands');
   const other = [...document.querySelectorAll('button')].find((node) => node.textContent?.includes('机位分配'))!;
+  expect(other.querySelector('[title="/tmp/stands"]')).not.toBeNull();
   await act(async () => other.click());
   expect(state.push).toHaveBeenCalledWith('/stands?token=t2');
-  const current = [...document.querySelectorAll('button')].find((node) => node.textContent?.includes('/tmp/blog'))!;
+  const current = document.querySelector('[data-current="true"]') as HTMLButtonElement;
+  expect(current.textContent).toContain('…/blog');
   await act(async () => current.click());
   expect(state.push).toHaveBeenCalledTimes(1);
 });

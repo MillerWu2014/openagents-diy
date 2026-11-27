@@ -17,7 +17,7 @@ import { AppHeader } from './app-header';
 import { OnboardingSurfaceContext } from './onboarding-surface';
 import { MobileShell } from './mobile-shell';
 import { WorkspaceTour } from '@/components/tours/workspace-tour';
-import { useLayout, RAIL_WIDTH_COLLAPSED, RAIL_WIDTH_EXPANDED } from './layout-context';
+import { useLayout, RAIL_WIDTH_COLLAPSED } from './layout-context';
 import { cn } from '@/lib/utils';
 import { hasAddedWorkspaceAgent, shouldOpenFirstRunOnboarding } from '@/lib/first-run-entry';
 import { RoutineList } from '@/components/routines/routine-list';
@@ -51,7 +51,7 @@ export function Wrapper() {
   useLandingNote();
   const {
     isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, setSidebarOpen,
-    hasListPanel, mobilePane, splitBrowser, showBrowserPreview, isRailExpanded, conversationWidth, setConversationWidth,
+    hasListPanel, mobilePane, splitBrowser, showBrowserPreview, isRailExpanded, railExpandedWidth, railDragWidth, railResizing, conversationWidth, setConversationWidth,
     filesSection, selectedAgentName, setSelectedAgentName, openView, connectSetupRequest,
   } = useLayout();
 
@@ -200,7 +200,7 @@ export function Wrapper() {
 
   // The shell sizes itself: rail width plus the list panel when it is showing.
   // Expanding the rail to show labels widens the shell by the same amount.
-  const railWidth = isRailExpanded ? RAIL_WIDTH_EXPANDED : RAIL_WIDTH_COLLAPSED;
+  const railWidth = railDragWidth ?? (isRailExpanded ? railExpandedWidth : RAIL_WIDTH_COLLAPSED);
   const shellWidth = railWidth + (sidebarOpen ? 388 : 0);
 
   // On a computer a narrow window stays the desktop shell: one narrower than
@@ -215,7 +215,10 @@ export function Wrapper() {
     <SidebarProvider
       open={sidebarOpen}
       onOpenChange={setSidebarOpen}
-      className="relative h-full min-h-0 bg-sidebar [&_.container-fluid]:px-5"
+      className={cn(
+        'relative h-full min-h-0 bg-sidebar [&_.container-fluid]:px-5',
+        railResizing && '[&_[data-slot=sidebar-gap]]:transition-none [&_[data-slot=sidebar-container]]:transition-none',
+      )}
       style={{
         minWidth: WORKSPACE_MIN_WIDTH,
         '--sidebar-width': `${shellWidth}px`,

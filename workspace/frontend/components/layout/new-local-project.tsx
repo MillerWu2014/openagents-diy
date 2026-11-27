@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -19,10 +18,15 @@ function fullHost() {
 }
 
 /** Create a project: name, one folder, and the agents that work in it. */
-export function NewLocalProject({ iconOnly }: { iconOnly?: boolean }) {
+export function NewLocalProject({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const t = useT();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [directory, setDirectory] = useState('');
   const [agents, setAgents] = useState<LocalAgentChoice[]>([]);
@@ -41,7 +45,7 @@ export function NewLocalProject({ iconOnly }: { iconOnly?: boolean }) {
   }, [open, host]);
 
   const close = (next: boolean) => {
-    setOpen(next);
+    onOpenChange(next);
     if (!next) {
       setName('');
       setDirectory('');
@@ -71,17 +75,7 @@ export function NewLocalProject({ iconOnly }: { iconOnly?: boolean }) {
   };
 
   return (
-    <>
-      <Button
-        variant="ghost"
-        size={iconOnly ? 'icon-xs' : 'xs'}
-        aria-label={t('dashboard.newWorkspace')}
-        onClick={() => setOpen(true)}
-      >
-        <Plus />
-        {!iconOnly && t('dashboard.newWorkspace')}
-      </Button>
-      <Dialog open={open} onOpenChange={close}>
+    <Dialog open={open} onOpenChange={close}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t('dashboard.createTitle')}</DialogTitle>
@@ -146,7 +140,6 @@ export function NewLocalProject({ iconOnly }: { iconOnly?: boolean }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
   );
 }
 
